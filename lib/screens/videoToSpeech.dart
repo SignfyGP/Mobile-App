@@ -2,7 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:camera/camera.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 
 class VideoToSpeechPage extends StatefulWidget {
@@ -15,9 +17,13 @@ class VideoToSpeechPage extends StatefulWidget {
 class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
   VideoPlayerController? _videoController;
   final AudioPlayer _audioPlayer = AudioPlayer();
+  final String _backendEndpoint = Platform.isAndroid
+      ? 'http://10.0.2.2:8000/video-to-speech'
+      : 'http://127.0.0.1:8000/video-to-speech';
   
   String? _recordedVideoPath;
   String? _generatedSpeechPath;
+  String? _translatedText;
   bool _isPlayingVideo = false;
   bool _isPlayingSpeech = false;
   bool _isTranslating = false;
@@ -126,7 +132,10 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
   }
 
   Future<void> _translateToSpeech() async {
-    if (_videoController == null || !_videoController!.value.isInitialized) {
+    final recordedVideoPath = _recordedVideoPath;
+    if (recordedVideoPath == null ||
+        _videoController == null ||
+        !_videoController!.value.isInitialized) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please load a video first')),
       );
@@ -137,26 +146,55 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
       _isTranslating = true;
     });
 
-    // Simulate translation process
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse(_backendEndpoint))
+        ..headers['accept'] = 'application/json'
+        ..files.add(
+          await http.MultipartFile.fromPath(
+            'video_file',
+            recordedVideoPath,
+            filename: 'video.mp4',
+          ),
+        );
 
-    // TODO: Replace with actual translation API call
-    // For now, just show a success message
-    if (!mounted) {
+      final streamedResponse = await request.send();
+      if (streamedResponse.statusCode < 200 || streamedResponse.statusCode >= 300) {
+        throw Exception('Server returned ${streamedResponse.statusCode}');
+      }
+
+      final responseBytes = await streamedResponse.stream.toBytes();
+      final tempDir = await getTemporaryDirectory();
+      final outputPath =
+          '${tempDir.path}/translated_speech_${DateTime.now().millisecondsSinceEpoch}.wav';
+      final outputFile = File(outputPath);
+      await outputFile.writeAsBytes(responseBytes, flush: true);
+
+      final encodedText = streamedResponse.headers['x-translated-text'];
+      final decodedText = encodedText == null ? null : Uri.decodeComponent(encodedText);
+
+      await _audioPlayer.stop();
+
+      if (!mounted) return;
+      setState(() {
+        _generatedSpeechPath = outputFile.path;
+        _translatedText = decodedText;
+        _isPlayingSpeech = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Video translated to speech!')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Translation failed: $error')),
+      );
+    } finally {
+      if (!mounted) return;
       setState(() {
         _isTranslating = false;
       });
-      return;
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Video translated to speech!')),
-    );
-
-    setState(() {
-      _isTranslating = false;
-      _generatedSpeechPath = 'path_to_generated_speech'; // Placeholder
-    });
   }
 
   Future<void> _toggleSpeechPlayback() async {
@@ -279,6 +317,13 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
                 'Generated Speech',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
               ),
+              if (_translatedText != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Translated Text: $_translatedText',
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ],
               const SizedBox(height: 12),
               ElevatedButton.icon(
                 onPressed: _generatedSpeechPath == null ? null : _toggleSpeechPlayback,

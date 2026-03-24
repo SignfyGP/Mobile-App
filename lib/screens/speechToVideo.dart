@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'dart:io';
+
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
@@ -14,11 +17,16 @@ class SpeechToVideoPage extends StatefulWidget {
 class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
   final AudioRecorder _audioRecorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
+  final String _backendEndpoint = Platform.isAndroid
+      ? 'http://10.0.2.2:8000/speech-to-skeleton-video'
+      : 'http://127.0.0.1:8000/speech-to-skeleton-video';
 
   VideoPlayerController? _videoController;
   String? _recordedFilePath;
   bool _isRecording = false;
   bool _isPlayingAudio = false;
+  bool _isTranslating = false;
+  String? _transcribedText;
 
   @override
   void initState() {
@@ -101,6 +109,67 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
     setState(() {});
   }
 
+  Future<void> _translateToSign() async {
+    final recordedFilePath = _recordedFilePath;
+    if (recordedFilePath == null) return;
+
+    setState(() {
+      _isTranslating = true;
+    });
+
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse(_backendEndpoint))
+        ..headers['accept'] = 'application/json'
+        ..files.add(
+          await http.MultipartFile.fromPath(
+            'speech_file',
+            recordedFilePath,
+            filename: 'speech.wav',
+          ),
+        );
+
+      final streamedResponse = await request.send();
+      if (streamedResponse.statusCode < 200 || streamedResponse.statusCode >= 300) {
+        throw Exception('Server returned ${streamedResponse.statusCode}');
+      }
+
+      final responseBytes = await streamedResponse.stream.toBytes();
+      final tempDir = await getTemporaryDirectory();
+      final outputPath =
+          '${tempDir.path}/skeleton_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      final outputFile = File(outputPath);
+      await outputFile.writeAsBytes(responseBytes, flush: true);
+
+      final encodedText = streamedResponse.headers['x-transcribed-text'];
+      final decodedText = encodedText == null
+          ? null
+          : Uri.decodeComponent(encodedText);
+
+      final oldController = _videoController;
+      final newController = VideoPlayerController.file(outputFile);
+      await newController.initialize();
+      await newController.play();
+
+      await oldController?.dispose();
+
+      if (!mounted) return;
+      setState(() {
+        _videoController = newController;
+        _transcribedText = decodedText;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Translation failed: $error')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isTranslating = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _audioRecorder.dispose();
@@ -137,6 +206,13 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
                 height: 200,
                 child: Center(child: CircularProgressIndicator()),
               ),
+            if (_transcribedText != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Transcribed: $_transcribedText',
+                style: const TextStyle(fontSize: 14),
+              ),
+            ],
             const SizedBox(height: 12),
             ElevatedButton.icon(
               onPressed: _toggleVideoPlayback,
@@ -165,13 +241,9 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
             ),
             const SizedBox(height: 12),
             ElevatedButton.icon(
-              onPressed: _recordedFilePath == null ? null : () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Translate to Sign feature coming soon!')),
-                );
-              },
+              onPressed: _recordedFilePath == null || _isTranslating ? null : _translateToSign,
               icon: const Icon(Icons.gesture),
-              label: const Text('Translate to Sign'),
+              label: Text(_isTranslating ? 'Translating...' : 'Translate to Sign'),
             ),
           ],
         ),
