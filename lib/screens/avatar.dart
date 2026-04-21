@@ -13,6 +13,7 @@ class _ViewerPageState extends State<ViewerPage> {
   final TextEditingController textController = TextEditingController();
   var animateCounter=0;
 
+  List<String> animationsList = ["291", "59", "294"];
   @override
   void dispose() {
     textController.dispose();
@@ -35,7 +36,7 @@ class _ViewerPageState extends State<ViewerPage> {
               child: SizedBox(
                 child: O3D(
                   controller: controller,
-                  src: 'assets/models/hero.glb',
+                  src: 'assets/models/sign_avatar.glb',
                   autoPlay: false,
                   cameraControls: false,
                 ),
@@ -57,8 +58,31 @@ class _ViewerPageState extends State<ViewerPage> {
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     FocusScope.of(context).unfocus();
+
+                    final availableAnimations =
+                        await controller.availableAnimations();
+                    if (availableAnimations.isEmpty ||
+                        animationsList.isEmpty) {
+                      return;
+                    }
+
+                    for (final animationName in animationsList) {
+                      if (!availableAnimations.contains(animationName)) {
+                        continue;
+                      }
+
+                      controller.animationName = animationName;
+                      controller.play(repetitions: 1);
+
+                      // Give each animation time to play before starting the next.
+                      await Future.delayed(const Duration(milliseconds: 1000));
+                    }
+                    // Reset avatar back to its initial animation frame.
+                    // controller.resetAnimation();
+                    await Future.delayed(const Duration(milliseconds: 50));
+                    controller.stopRotation();
                   },
                   child: const Text('Submit'),
                 ),
@@ -70,40 +94,31 @@ class _ViewerPageState extends State<ViewerPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                ElevatedButton(
-                  onPressed: () async {
-                    // example: list animations and play first
-                    final animations = await controller.availableAnimations();
-                    if (animations.isNotEmpty) {
-                      controller.animationName = animations[0];
-                      controller.play(repetitions: 1);
-                    }
-                  },
-                  style: style,
-                  child: const Text('لا اعلم'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final animations = await controller.availableAnimations();
-                    if (animations.isNotEmpty) {
-                      controller.animationName = animations[1];
-                      controller.play(repetitions: 1);
-                    }
-                  },
-                  style: style,
-                  child: const Text('مرحبا'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final animations = await controller.availableAnimations();
-                    if (animations.isNotEmpty) {
-                      controller.animationName = animations[2];
-                      controller.play(repetitions: 1);
-                    }
-                  },
-                  style: style,
-                  child: const Text('احترام'),
-                ),
+                // ElevatedButton(
+                //   onPressed: () async {
+                //     // example: list animations and play first
+                //     final animations = await controller.availableAnimations();
+                //     print(animations);
+                //     if (animations.isNotEmpty) {
+                //       controller.animationName = animations[0];
+                //       controller.play(repetitions: 1);
+                    
+                //     }
+                //   },
+                //   style: style,
+                //   child: const Text('لا اعلم'),
+                // ),
+                // ElevatedButton(
+                //   onPressed: () async {
+                //     final animations = await controller.availableAnimations();
+                //     if (animations.isNotEmpty) {
+                //       controller.animationName = animations[2];
+                //       controller.play(repetitions: 1);
+                //     }
+                //   },
+                //   style: style,
+                //   child: const Text('احترام'),
+                // ),
               ],
             ),
           ),
