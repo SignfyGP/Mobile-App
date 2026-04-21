@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
+
+import 'package:flutter_3d_controller/flutter_3d_controller.dart';
+
 
 class SpeechToVideoPage extends StatefulWidget {
   const SpeechToVideoPage({super.key});
@@ -27,6 +31,9 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
   bool _isPlayingAudio = false;
   bool _isTranslating = false;
   String? _transcribedText;
+  List<String> _animationList = [];
+
+  final Flutter3DController controller = Flutter3DController();
 
   @override
   void initState() {
@@ -133,30 +140,25 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
         throw Exception('Server returned ${streamedResponse.statusCode}');
       }
 
-      final responseBytes = await streamedResponse.stream.toBytes();
-      final tempDir = await getTemporaryDirectory();
-      final outputPath =
-          '${tempDir.path}/skeleton_${DateTime.now().millisecondsSinceEpoch}.mp4';
-      final outputFile = File(outputPath);
-      await outputFile.writeAsBytes(responseBytes, flush: true);
+      final response = await http.Response.fromStream(streamedResponse);
+      final decodedJson = jsonDecode(response.body);
+      if (decodedJson is! Map<String, dynamic>) {
+        throw Exception('Unexpected response format');
+      }
 
-      final encodedText = streamedResponse.headers['x-transcribed-text'];
-      final decodedText = encodedText == null
-          ? null
-          : Uri.decodeComponent(encodedText);
-
-      final oldController = _videoController;
-      final newController = VideoPlayerController.file(outputFile);
-      await newController.initialize();
-      await newController.play();
-
-      await oldController?.dispose();
+      final decodedText = decodedJson['transcribed_text']?.toString();
+      final signIds = decodedJson['sign_ids'];
+      final animationList = signIds is List
+          ? signIds.map((id) => id.toString()).toList()
+          : <String>[];
 
       if (!mounted) return;
       setState(() {
-        _videoController = newController;
         _transcribedText = decodedText;
+        _animationList = animationList;
       });
+
+      await _playAvatarAnimations(animationList);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -168,6 +170,28 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
         _isTranslating = false;
       });
     }
+  }
+
+  Future<void> _playAvatarAnimations(List<String> animationsList) async {
+    final availableAnimations =
+        (await controller.getAvailableAnimations()).map((item) => item.toString()).toSet();
+    debugPrint('Available Animations: $availableAnimations');
+
+    if (availableAnimations.isEmpty || animationsList.isEmpty) {
+      return;
+    }
+
+    for (final animationName in animationsList) {
+      if (!availableAnimations.contains(animationName)) {
+        continue;
+      }
+
+      controller.playAnimation(animationName: animationName);
+      await Future.delayed(const Duration(milliseconds: 1200));
+    }
+
+    await Future.delayed(const Duration(milliseconds: 300));
+    controller.stopAnimation();
   }
 
   @override
@@ -199,7 +223,25 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
             if (videoController != null && videoController.value.isInitialized)
               AspectRatio(
                 aspectRatio: videoController.value.aspectRatio,
-                child: VideoPlayer(videoController),
+                child: SizedBox(
+                child: Flutter3DViewer(
+                  activeGestureInterceptor: true,
+                   progressBarColor: Colors.orange,
+                  enableTouch: true,
+                  onProgress: (double progressValue) {
+                    debugPrint('model loading progress : $progressValue');
+                  },
+                  onLoad: (String modelAddress) {
+                    debugPrint('model loaded : $modelAddress');
+                  },
+                  onError: (String error) {
+                    debugPrint('model failed to load : $error');
+                  },
+                  controller: controller,
+                  src: 'assets/models/sign_avatar.glb',
+
+                ),
+              ),
               )
             else
               const SizedBox(
@@ -211,6 +253,13 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
               Text(
                 'Transcribed: $_transcribedText',
                 style: const TextStyle(fontSize: 14),
+              ),
+            ],
+            if (_animationList.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Animation IDs: ${_animationList.join(', ')}',
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
               ),
             ],
             const SizedBox(height: 12),

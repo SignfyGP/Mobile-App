@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:o3d/o3d.dart';
+import 'package:flutter_3d_controller/flutter_3d_controller.dart';
+
 
 
 class ViewerPage extends StatefulWidget {
@@ -9,7 +11,7 @@ class ViewerPage extends StatefulWidget {
 }
 
 class _ViewerPageState extends State<ViewerPage> {
-  final O3DController controller = O3DController();
+  final Flutter3DController controller = Flutter3DController();
   final TextEditingController textController = TextEditingController();
   var animateCounter=0;
 
@@ -22,6 +24,11 @@ class _ViewerPageState extends State<ViewerPage> {
 
   @override
   Widget build(BuildContext context) {
+
+
+    controller.onModelLoaded.addListener(() {
+      debugPrint('model is loaded : ${controller.onModelLoaded.value}');
+    });
     final ButtonStyle style = ElevatedButton.styleFrom(
       textStyle: const TextStyle(fontSize: 28),
     );
@@ -34,11 +41,22 @@ class _ViewerPageState extends State<ViewerPage> {
           Expanded(
             child: Center(
               child: SizedBox(
-                child: O3D(
+                child: Flutter3DViewer(
+                  activeGestureInterceptor: true,
+                   progressBarColor: Colors.orange,
+                  enableTouch: true,
+                  onProgress: (double progressValue) {
+                    debugPrint('model loading progress : $progressValue');
+                  },
+                  onLoad: (String modelAddress) {
+                    debugPrint('model loaded : $modelAddress');
+                  },
+                  onError: (String error) {
+                    debugPrint('model failed to load : $error');
+                  },
                   controller: controller,
                   src: 'assets/models/sign_avatar.glb',
-                  autoPlay: false,
-                  cameraControls: false,
+
                 ),
               ),
             ),
@@ -62,7 +80,8 @@ class _ViewerPageState extends State<ViewerPage> {
                     FocusScope.of(context).unfocus();
 
                     final availableAnimations =
-                        await controller.availableAnimations();
+                      await controller.getAvailableAnimations();
+                    print("Available Animations: ${availableAnimations}");
                     if (availableAnimations.isEmpty ||
                         animationsList.isEmpty) {
                       return;
@@ -73,16 +92,15 @@ class _ViewerPageState extends State<ViewerPage> {
                         continue;
                       }
 
-                      controller.animationName = animationName;
-                      controller.play(repetitions: 1);
+                      controller.playAnimation(animationName: animationName);
 
                       // Give each animation time to play before starting the next.
-                      await Future.delayed(const Duration(milliseconds: 1000));
+                      await Future.delayed(const Duration(milliseconds: 1200));
                     }
                     // Reset avatar back to its initial animation frame.
                     // controller.resetAnimation();
-                    await Future.delayed(const Duration(milliseconds: 50));
-                    controller.stopRotation();
+                    await Future.delayed(const Duration(milliseconds: 300));
+                    controller.stopAnimation();
                   },
                   child: const Text('Submit'),
                 ),
