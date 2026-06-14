@@ -1,4 +1,4 @@
-package com.example.signfiy
+package com.example.signfy
 
 import io.flutter.embedding.android.FlutterActivity
 

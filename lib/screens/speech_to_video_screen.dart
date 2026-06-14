@@ -1,15 +1,13 @@
-import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_3d_controller/flutter_3d_controller.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
-
-import 'package:flutter_3d_controller/flutter_3d_controller.dart';
-
 
 class SpeechToVideoPage extends StatefulWidget {
   const SpeechToVideoPage({super.key});
@@ -21,36 +19,42 @@ class SpeechToVideoPage extends StatefulWidget {
 class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
   final AudioRecorder _audioRecorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
+  final Flutter3DController _avatarController = Flutter3DController();
   final String _backendEndpoint = Platform.isAndroid
       ? 'http://10.0.2.2:8000/speech-to-skeleton-video'
       : 'http://127.0.0.1:8000/speech-to-skeleton-video';
 
   VideoPlayerController? _videoController;
   String? _recordedFilePath;
+  String? _transcribedText;
+  List<String> _animationList = [];
   bool _isRecording = false;
   bool _isPlayingAudio = false;
   bool _isTranslating = false;
-  String? _transcribedText;
-  List<String> _animationList = [];
-
-  final Flutter3DController controller = Flutter3DController();
 
   @override
   void initState() {
     super.initState();
     _audioPlayer.onPlayerComplete.listen((_) {
       if (!mounted) return;
-      setState(() {
-        _isPlayingAudio = false;
-      });
+      setState(() => _isPlayingAudio = false);
     });
 
     _videoController = VideoPlayerController.networkUrl(
-      Uri.parse('https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4'),
+      Uri.parse(
+          'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4'),
     )..initialize().then((_) {
-      if (!mounted) return;
-      setState(() {});
-    });
+        if (!mounted) return;
+        setState(() {});
+      });
+  }
+
+  @override
+  void dispose() {
+    _audioRecorder.dispose();
+    _audioPlayer.dispose();
+    _videoController?.dispose();
+    super.dispose();
   }
 
   Future<void> _toggleRecording() async {
@@ -58,9 +62,7 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
       final path = await _audioRecorder.stop();
       setState(() {
         _isRecording = false;
-        if (path != null) {
-          _recordedFilePath = path;
-        }
+        if (path != null) _recordedFilePath = path;
       });
       return;
     }
@@ -75,15 +77,13 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
     }
 
     final tempDir = await getTemporaryDirectory();
-    final path = '${tempDir.path}/speech_to_video_${DateTime.now().millisecondsSinceEpoch}.wav';
+    final path =
+        '${tempDir.path}/speech_${DateTime.now().millisecondsSinceEpoch}.wav';
     await _audioRecorder.start(
       const RecordConfig(encoder: AudioEncoder.wav),
       path: path,
     );
-
-    setState(() {
-      _isRecording = true;
-    });
+    setState(() => _isRecording = true);
   }
 
   Future<void> _toggleAudioPlayback() async {
@@ -91,27 +91,19 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
 
     if (_isPlayingAudio) {
       await _audioPlayer.stop();
-      setState(() {
-        _isPlayingAudio = false;
-      });
+      setState(() => _isPlayingAudio = false);
       return;
     }
 
     await _audioPlayer.play(DeviceFileSource(_recordedFilePath!));
-    setState(() {
-      _isPlayingAudio = true;
-    });
+    setState(() => _isPlayingAudio = true);
   }
 
   Future<void> _toggleVideoPlayback() async {
     final controller = _videoController;
     if (controller == null || !controller.value.isInitialized) return;
 
-    if (controller.value.isPlaying) {
-      await controller.pause();
-    } else {
-      await controller.play();
-    }
+    controller.value.isPlaying ? await controller.pause() : await controller.play();
     if (!mounted) return;
     setState(() {});
   }
@@ -120,23 +112,20 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
     final recordedFilePath = _recordedFilePath;
     if (recordedFilePath == null) return;
 
-    setState(() {
-      _isTranslating = true;
-    });
+    setState(() => _isTranslating = true);
 
     try {
       final request = http.MultipartRequest('POST', Uri.parse(_backendEndpoint))
         ..headers['accept'] = 'application/json'
-        ..files.add(
-          await http.MultipartFile.fromPath(
-            'speech_file',
-            recordedFilePath,
-            filename: 'speech.wav',
-          ),
-        );
+        ..files.add(await http.MultipartFile.fromPath(
+          'speech_file',
+          recordedFilePath,
+          filename: 'speech.wav',
+        ));
 
       final streamedResponse = await request.send();
-      if (streamedResponse.statusCode < 200 || streamedResponse.statusCode >= 300) {
+      if (streamedResponse.statusCode < 200 ||
+          streamedResponse.statusCode >= 300) {
         throw Exception('Server returned ${streamedResponse.statusCode}');
       }
 
@@ -146,7 +135,7 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
         throw Exception('Unexpected response format');
       }
 
-      final decodedText = decodedJson['transcribed_text']?.toString();
+      final transcribedText = decodedJson['transcribed_text']?.toString();
       final signIds = decodedJson['sign_ids'];
       final animationList = signIds is List
           ? signIds.map((id) => id.toString()).toList()
@@ -154,7 +143,7 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
 
       if (!mounted) return;
       setState(() {
-        _transcribedText = decodedText;
+        _transcribedText = transcribedText;
         _animationList = animationList;
       });
 
@@ -165,132 +154,89 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
         SnackBar(content: Text('Translation failed: $error')),
       );
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isTranslating = false;
-      });
+      if (mounted) setState(() => _isTranslating = false);
     }
   }
 
-  Future<void> _playAvatarAnimations(List<String> animationsList) async {
-    final availableAnimations =
-        (await controller.getAvailableAnimations()).map((item) => item.toString()).toSet();
-    debugPrint('Available Animations: $availableAnimations');
+  Future<void> _playAvatarAnimations(List<String> animations) async {
+    final available = (await _avatarController.getAvailableAnimations())
+        .map((e) => e.toString())
+        .toSet();
 
-    if (availableAnimations.isEmpty || animationsList.isEmpty) {
-      return;
-    }
+    if (available.isEmpty || animations.isEmpty) return;
 
-    for (final animationName in animationsList) {
-      if (!availableAnimations.contains(animationName)) {
-        continue;
-      }
-
-      controller.playAnimation(animationName: animationName);
+    for (final name in animations) {
+      if (!available.contains(name)) continue;
+      _avatarController.playAnimation(animationName: name);
       await Future.delayed(const Duration(milliseconds: 1200));
     }
 
     await Future.delayed(const Duration(milliseconds: 300));
-    controller.stopAnimation();
-  }
-
-  @override
-  void dispose() {
-    _audioRecorder.dispose();
-    _audioPlayer.dispose();
-    _videoController?.dispose();
-    super.dispose();
+    _avatarController.stopAnimation();
   }
 
   @override
   Widget build(BuildContext context) {
     final videoController = _videoController;
+    final isPlaying = videoController?.value.isPlaying ?? false;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Speech to Sign Video')),
+      appBar: AppBar(title: const Text('Speech to Sign')),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            
-            
             const Text(
-              'Sign Video',
+              'Sign Avatar',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
-            if (videoController != null && videoController.value.isInitialized)
-              AspectRatio(
-                aspectRatio: videoController.value.aspectRatio,
-                child: SizedBox(
-                child: Flutter3DViewer(
-                  activeGestureInterceptor: true,
-                   progressBarColor: const Color(0xFF00CFFF),
-                  enableTouch: true,
-                  onProgress: (double progressValue) {
-                    debugPrint('model loading progress : $progressValue');
-                  },
-                  onLoad: (String modelAddress) {
-                    debugPrint('model loaded : $modelAddress');
-                  },
-                  onError: (String error) {
-                    debugPrint('model failed to load : $error');
-                  },
-                  controller: controller,
-                  src: 'assets/models/sign_avatar.glb',
-
-                ),
+            Expanded(
+              child: Flutter3DViewer(
+                activeGestureInterceptor: true,
+                progressBarColor: const Color(0xFF00CFFF),
+                enableTouch: true,
+                controller: _avatarController,
+                src: 'assets/models/sign_avatar.glb',
               ),
-              )
-            else
-              const SizedBox(
-                height: 200,
-                child: Center(child: CircularProgressIndicator()),
-              ),
+            ),
             if (_transcribedText != null) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Text(
                 'Transcribed: $_transcribedText',
                 style: const TextStyle(fontSize: 14),
               ),
             ],
             if (_animationList.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Text(
-                'Animation IDs: ${_animationList.join(', ')}',
+                'Signs: ${_animationList.join(', ')}',
                 style: const TextStyle(fontSize: 12, color: Colors.white54),
               ),
             ],
             const SizedBox(height: 12),
             ElevatedButton.icon(
               onPressed: _toggleVideoPlayback,
-              icon: Icon(
-                videoController != null && videoController.value.isPlaying
-                    ? Icons.pause
-                    : Icons.play_arrow,
-              ),
-              label: Text(
-                videoController != null && videoController.value.isPlaying
-                    ? 'Pause Video'
-                    : 'Play Video',
-              ),
+              icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+              label: Text(isPlaying ? 'Pause Video' : 'Play Video'),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
             ElevatedButton.icon(
               onPressed: _toggleRecording,
               icon: Icon(_isRecording ? Icons.stop : Icons.mic),
               label: Text(_isRecording ? 'Stop Recording' : 'Record Voice'),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             ElevatedButton.icon(
               onPressed: _recordedFilePath == null ? null : _toggleAudioPlayback,
               icon: Icon(_isPlayingAudio ? Icons.stop_circle : Icons.play_arrow),
               label: Text(_isPlayingAudio ? 'Stop Voice' : 'Play Recorded Voice'),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             ElevatedButton.icon(
-              onPressed: _recordedFilePath == null || _isTranslating ? null : _translateToSign,
+              onPressed:
+                  _recordedFilePath == null || _isTranslating ? null : _translateToSign,
               icon: const Icon(Icons.gesture),
               label: Text(_isTranslating ? 'Translating...' : 'Translate to Sign'),
             ),

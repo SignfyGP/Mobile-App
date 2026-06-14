@@ -1,7 +1,8 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:camera/camera.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -15,12 +16,12 @@ class VideoToSpeechPage extends StatefulWidget {
 }
 
 class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
-  VideoPlayerController? _videoController;
   final AudioPlayer _audioPlayer = AudioPlayer();
   final String _backendEndpoint = Platform.isAndroid
       ? 'http://10.0.2.2:8000/video-to-speech'
       : 'http://127.0.0.1:8000/video-to-speech';
-  
+
+  VideoPlayerController? _videoController;
   String? _recordedVideoPath;
   String? _generatedSpeechPath;
   String? _translatedText;
@@ -33,34 +34,36 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
     super.initState();
     _audioPlayer.onPlayerComplete.listen((_) {
       if (!mounted) return;
-      setState(() {
-        _isPlayingSpeech = false;
-      });
+      setState(() => _isPlayingSpeech = false);
     });
   }
 
-  Future<void> _initializeVideo(String videoPath) async {
-    // Dispose old controller
+  @override
+  void dispose() {
     _videoController?.dispose();
-    
-    _videoController = VideoPlayerController.file(
-      File(videoPath),
-    )..initialize().then((_) {
-      if (!mounted) return;
-      setState(() {
-        _recordedVideoPath = videoPath;
-        _isPlayingVideo = false;
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initializeVideo(String videoPath) async {
+    _videoController?.dispose();
+    _videoController = VideoPlayerController.file(File(videoPath))
+      ..initialize().then((_) {
+        if (!mounted) return;
+        setState(() {
+          _recordedVideoPath = videoPath;
+          _isPlayingVideo = false;
+        });
+      }).catchError((error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading video: $error')),
+        );
       });
-    }).catchError((error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading video: $error')),
-      );
-    });
   }
 
   Future<void> _recordNewVideo() async {
     try {
-      // Get available cameras
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
         if (!mounted) return;
@@ -70,13 +73,10 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
         return;
       }
 
-      // Navigate to camera recording page
       if (!mounted) return;
       final videoPath = await Navigator.push<String>(
         context,
-        MaterialPageRoute(
-          builder: (_) => CameraRecorderPage(camera: cameras[0]),
-        ),
+        MaterialPageRoute(builder: (_) => CameraRecorderPage(camera: cameras[0])),
       );
 
       if (videoPath != null) {
@@ -97,10 +97,7 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
   Future<void> _selectVideoFromGallery() async {
     try {
       final picker = ImagePicker();
-      final pickedFile = await picker.pickVideo(
-        source: ImageSource.gallery,
-      );
-
+      final pickedFile = await picker.pickVideo(source: ImageSource.gallery);
       if (pickedFile != null) {
         await _initializeVideo(pickedFile.path);
         if (!mounted) return;
@@ -120,15 +117,9 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
     final controller = _videoController;
     if (controller == null || !controller.value.isInitialized) return;
 
-    if (controller.value.isPlaying) {
-      await controller.pause();
-    } else {
-      await controller.play();
-    }
+    controller.value.isPlaying ? await controller.pause() : await controller.play();
     if (!mounted) return;
-    setState(() {
-      _isPlayingVideo = controller.value.isPlaying;
-    });
+    setState(() => _isPlayingVideo = controller.value.isPlaying);
   }
 
   Future<void> _translateToSpeech() async {
@@ -142,35 +133,33 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
       return;
     }
 
-    setState(() {
-      _isTranslating = true;
-    });
+    setState(() => _isTranslating = true);
 
     try {
       final request = http.MultipartRequest('POST', Uri.parse(_backendEndpoint))
         ..headers['accept'] = 'application/json'
-        ..files.add(
-          await http.MultipartFile.fromPath(
-            'video_file',
-            recordedVideoPath,
-            filename: 'video.mp4',
-          ),
-        );
+        ..files.add(await http.MultipartFile.fromPath(
+          'video_file',
+          recordedVideoPath,
+          filename: 'video.mp4',
+        ));
 
       final streamedResponse = await request.send();
-      if (streamedResponse.statusCode < 200 || streamedResponse.statusCode >= 300) {
+      if (streamedResponse.statusCode < 200 ||
+          streamedResponse.statusCode >= 300) {
         throw Exception('Server returned ${streamedResponse.statusCode}');
       }
 
       final responseBytes = await streamedResponse.stream.toBytes();
       final tempDir = await getTemporaryDirectory();
       final outputPath =
-          '${tempDir.path}/translated_speech_${DateTime.now().millisecondsSinceEpoch}.wav';
+          '${tempDir.path}/speech_${DateTime.now().millisecondsSinceEpoch}.wav';
       final outputFile = File(outputPath);
       await outputFile.writeAsBytes(responseBytes, flush: true);
 
       final encodedText = streamedResponse.headers['x-translated-text'];
-      final decodedText = encodedText == null ? null : Uri.decodeComponent(encodedText);
+      final decodedText =
+          encodedText == null ? null : Uri.decodeComponent(encodedText);
 
       await _audioPlayer.stop();
 
@@ -190,10 +179,7 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
         SnackBar(content: Text('Translation failed: $error')),
       );
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isTranslating = false;
-      });
+      if (mounted) setState(() => _isTranslating = false);
     }
   }
 
@@ -202,41 +188,28 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
 
     if (_isPlayingSpeech) {
       await _audioPlayer.stop();
-      setState(() {
-        _isPlayingSpeech = false;
-      });
+      setState(() => _isPlayingSpeech = false);
       return;
     }
 
     await _audioPlayer.play(DeviceFileSource(_generatedSpeechPath!));
-    setState(() {
-      _isPlayingSpeech = true;
-    });
-  }
-
-  @override
-  void dispose() {
-    _videoController?.dispose();
-    _audioPlayer.dispose();
-    super.dispose();
+    setState(() => _isPlayingSpeech = true);
   }
 
   @override
   Widget build(BuildContext context) {
     final videoController = _videoController;
-    final hasVideo = videoController != null && videoController.value.isInitialized;
+    final hasVideo =
+        videoController != null && videoController.value.isInitialized;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Video to Speech'),
-      ),
+      appBar: AppBar(title: const Text('Sign to Speech')),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Video Section
               const Text(
                 'Input Video',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
@@ -262,8 +235,6 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
                   ),
                 ),
               const SizedBox(height: 12),
-              
-              // Video Control Buttons
               Row(
                 children: [
                   Expanded(
@@ -283,21 +254,18 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               ElevatedButton.icon(
                 onPressed: hasVideo ? _toggleVideoPlayback : null,
                 icon: Icon(
-                  hasVideo && _isPlayingVideo ? Icons.pause : Icons.play_arrow,
-                ),
+                    hasVideo && _isPlayingVideo ? Icons.pause : Icons.play_arrow),
                 label: Text(
-                  hasVideo && _isPlayingVideo ? 'Pause Video' : 'Play Video',
-                ),
+                    hasVideo && _isPlayingVideo ? 'Pause Video' : 'Play Video'),
               ),
               const SizedBox(height: 24),
-              
-              // Translation Section
               ElevatedButton.icon(
-                onPressed: _isTranslating || !hasVideo ? null : _translateToSpeech,
+                onPressed:
+                    _isTranslating || !hasVideo ? null : _translateToSpeech,
                 icon: _isTranslating
                     ? const SizedBox(
                         width: 20,
@@ -306,12 +274,9 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
                       )
                     : const Icon(Icons.language),
                 label: Text(
-                  _isTranslating ? 'Translating...' : 'Translate to Speech',
-                ),
+                    _isTranslating ? 'Translating...' : 'Translate to Speech'),
               ),
               const SizedBox(height: 24),
-              
-              // Speech Output Section
               const Text(
                 'Generated Speech',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
@@ -319,19 +284,19 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
               if (_translatedText != null) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Translated Text: $_translatedText',
+                  'Translated: $_translatedText',
                   style: const TextStyle(fontSize: 14),
                 ),
               ],
               const SizedBox(height: 12),
               ElevatedButton.icon(
-                onPressed: _generatedSpeechPath == null ? null : _toggleSpeechPlayback,
+                onPressed:
+                    _generatedSpeechPath == null ? null : _toggleSpeechPlayback,
                 icon: Icon(
-                  _isPlayingSpeech ? Icons.stop_circle : Icons.play_arrow,
-                ),
-                label: Text(
-                  _isPlayingSpeech ? 'Stop Speech' : 'Play Generated Speech',
-                ),
+                    _isPlayingSpeech ? Icons.stop_circle : Icons.play_arrow),
+                label: Text(_isPlayingSpeech
+                    ? 'Stop Speech'
+                    : 'Play Generated Speech'),
               ),
             ],
           ),
@@ -341,33 +306,25 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
   }
 }
 
-
-
 class CameraRecorderPage extends StatefulWidget {
+  const CameraRecorderPage({super.key, required this.camera});
   final CameraDescription camera;
-
-  const CameraRecorderPage({
-    super.key,
-    required this.camera,
-  });
 
   @override
   State<CameraRecorderPage> createState() => _CameraRecorderPageState();
 }
 
 class _CameraRecorderPageState extends State<CameraRecorderPage> {
-  late CameraController _cameraController;
-  late Future<void> _initializeControllerFuture;
+  late final CameraController _cameraController;
+  late final Future<void> _initFuture;
   bool _isRecording = false;
 
   @override
   void initState() {
     super.initState();
-    _cameraController = CameraController(
-      widget.camera,
-      ResolutionPreset.high,
-    );
-    _initializeControllerFuture = _cameraController.initialize();
+    _cameraController =
+        CameraController(widget.camera, ResolutionPreset.high);
+    _initFuture = _cameraController.initialize();
   }
 
   @override
@@ -379,17 +336,14 @@ class _CameraRecorderPageState extends State<CameraRecorderPage> {
   Future<void> _toggleRecording() async {
     try {
       if (_isRecording) {
-        final XFile videoFile = await _cameraController.stopVideoRecording();
-        if (mounted) {
-          Navigator.pop(context, videoFile.path);
-        }
+        final file = await _cameraController.stopVideoRecording();
+        if (mounted) Navigator.pop(context, file.path);
       } else {
         await _cameraController.startVideoRecording();
-        setState(() {
-          _isRecording = true;
-        });
+        setState(() => _isRecording = true);
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
@@ -399,57 +353,46 @@ class _CameraRecorderPageState extends State<CameraRecorderPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Record Video'),
-      ),
+      appBar: AppBar(title: const Text('Record Video')),
       body: FutureBuilder<void>(
-        future: _initializeControllerFuture,
+        future: _initFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
-            return Column(
-              children: [
-                Expanded(
-                  child: CameraPreview(_cameraController),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: _toggleRecording,
-                        icon: Icon(
-                          _isRecording ? Icons.stop_circle : Icons.videocam,
-                        ),
-                        label: Text(
-                          _isRecording ? 'Stop Recording' : 'Start Recording',
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close),
-                        label: const Text('Cancel'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          } else {
+          if (snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
+          return Column(
+            children: [
+              Expanded(child: CameraPreview(_cameraController)),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _toggleRecording,
+                      icon: Icon(
+                          _isRecording ? Icons.stop_circle : Icons.videocam),
+                      label: Text(
+                          _isRecording ? 'Stop Recording' : 'Start Recording'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                      label: const Text('Cancel'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
         },
       ),
     );
