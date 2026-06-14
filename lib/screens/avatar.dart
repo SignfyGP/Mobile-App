@@ -34,7 +34,6 @@ class _ViewerPageState extends State<ViewerPage> {
     );
     return Scaffold(
       appBar: AppBar(
-          backgroundColor: Colors.blueAccent,
           title: const Text('Signfiy')),
       body: Column(
         children: [
@@ -43,7 +42,7 @@ class _ViewerPageState extends State<ViewerPage> {
               child: SizedBox(
                 child: Flutter3DViewer(
                   activeGestureInterceptor: true,
-                   progressBarColor: Colors.orange,
+                   progressBarColor: const Color(0xFF00CFFF),
                   enableTouch: true,
                   onProgress: (double progressValue) {
                     debugPrint('model loading progress : $progressValue');

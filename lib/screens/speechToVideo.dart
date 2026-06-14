@@ -226,7 +226,7 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
                 child: SizedBox(
                 child: Flutter3DViewer(
                   activeGestureInterceptor: true,
-                   progressBarColor: Colors.orange,
+                   progressBarColor: const Color(0xFF00CFFF),
                   enableTouch: true,
                   onProgress: (double progressValue) {
                     debugPrint('model loading progress : $progressValue');
@@ -259,7 +259,7 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
               const SizedBox(height: 8),
               Text(
                 'Animation IDs: ${_animationList.join(', ')}',
-                style: const TextStyle(fontSize: 12, color: Colors.black54),
+                style: const TextStyle(fontSize: 12, color: Colors.white54),
               ),
             ],
             const SizedBox(height: 12),

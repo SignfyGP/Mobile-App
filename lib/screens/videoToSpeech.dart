@@ -229,7 +229,6 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Video to Speech'),
-        backgroundColor: Colors.blueAccent,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -252,13 +251,13 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
                 Container(
                   height: 200,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: const Color(0xFF162235),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Center(
                     child: Text(
                       'No video selected',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                      style: TextStyle(fontSize: 16, color: Colors.white54),
                     ),
                   ),
                 ),
@@ -402,7 +401,6 @@ class _CameraRecorderPageState extends State<CameraRecorderPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Record Video'),
-        backgroundColor: Colors.blueAccent,
       ),
       body: FutureBuilder<void>(
         future: _initializeControllerFuture,

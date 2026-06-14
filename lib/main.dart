@@ -11,6 +11,7 @@ import 'package:video_player/video_player.dart';
 import './screens/speechToVideo.dart';
 import './screens/videoToSpeech.dart';
 import './screens/avatar.dart';
+import './screens/splash_screen.dart';
 
 void main() => runApp(const MyApp());
 
@@ -19,8 +20,25 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext c) =>
       MaterialApp(
-        theme: ThemeData(colorSchemeSeed: Colors.blueAccent),
-        home: const HomePage(),
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          useMaterial3: true,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF00CFFF),
+            brightness: Brightness.dark,
+          ).copyWith(
+            secondary: const Color(0xFF9333EA),
+            onSecondary: Colors.white,
+          ),
+          scaffoldBackgroundColor: const Color(0xFF0A1628),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Color(0xFF0D1B2E),
+            foregroundColor: Color(0xFF00CFFF),
+            elevation: 0,
+            centerTitle: true,
+          ),
+        ),
+        home: const SplashScreen(nextScreen: HomePage()),
       );
 }
 
@@ -31,7 +49,6 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.blueAccent,
         title: const Text('Signfiy'),
       ),
       body: Padding(
