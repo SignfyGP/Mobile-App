@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:signfy/core/services/settings_service.dart';
 import 'package:signfy/core/theme/app_theme.dart';
 import 'package:signfy/screens/home_screen.dart';
 import 'package:signfy/screens/splash_screen.dart';
 
-void main() => runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SettingsService.initialize();
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});

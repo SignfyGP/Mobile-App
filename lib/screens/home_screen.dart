@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:signfy/core/constants/colors.dart';
 import 'package:signfy/screens/avatar_screen.dart';
+import 'package:signfy/screens/settings_screen.dart';
 import 'package:signfy/screens/speech_to_video_screen.dart';
 import 'package:signfy/screens/video_to_speech_screen.dart';
 import 'package:signfy/widgets/explore_card.dart';
@@ -26,7 +27,18 @@ class HomePage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 32),
-              const HomeHeader(),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Expanded(child: HomeHeader()),
+                  IconButton(
+                    onPressed: () => _go(context, const SettingsScreen()),
+                    icon: const Icon(Icons.settings_outlined),
+                    color: AppColors.secondaryText,
+                    tooltip: 'Settings',
+                  ),
+                ],
+              ),
               const SizedBox(height: 40),
               const SectionLabel('Translation Modes'),
               const SizedBox(height: 16),

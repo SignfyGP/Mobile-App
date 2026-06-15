@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +6,7 @@ import 'package:flutter_3d_controller/flutter_3d_controller.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:signfy/core/services/settings_service.dart';
 import 'package:video_player/video_player.dart';
 
 class SpeechToVideoPage extends StatefulWidget {
@@ -20,9 +20,9 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
   final AudioRecorder _audioRecorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
   final Flutter3DController _avatarController = Flutter3DController();
-  final String _backendEndpoint = Platform.isAndroid
-      ? 'http://10.0.2.2:8000/speech-to-skeleton-video'
-      : 'http://127.0.0.1:8000/speech-to-skeleton-video';
+
+  String get _backendEndpoint =>
+      '${SettingsService.instance.backendBaseUrl}/speech-to-skeleton-video';
 
   VideoPlayerController? _videoController;
   String? _recordedFilePath;

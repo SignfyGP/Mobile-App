@@ -31,22 +31,6 @@ class ExploreCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           child: Stack(
             children: [
-              // Positioned(
-              //   right: -20,
-              //   top: -20,
-              //   child: _Ring(
-              //     size: 120,
-              //     color: AppColors.cyan.withValues(alpha: 0.07),
-              //   ),
-              // ),
-              // Positioned(
-              //   right: 20,
-              //   top: 10,
-              //   child: _Ring(
-              //     size: 70,
-              //     color: AppColors.purple.withValues(alpha: 0.08),
-              //   ),
-              // ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
@@ -117,24 +101,6 @@ class ExploreCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _Ring extends StatelessWidget {
-  const _Ring({required this.size, required this.color});
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: color, width: 1.5),
       ),
     );
   }
