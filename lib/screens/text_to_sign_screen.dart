@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_3d_controller/flutter_3d_controller.dart';
 import 'package:http/http.dart' as http;
+import 'package:signfy/core/constants/app_config.dart';
 import 'package:signfy/core/constants/colors.dart';
 import 'package:signfy/core/constants/strings.dart';
 import 'package:signfy/core/services/settings_service.dart';
@@ -23,8 +24,7 @@ class _TextToSignPageState extends State<TextToSignPage> {
   final Flutter3DController _avatarController = Flutter3DController();
   final TextEditingController _textController = TextEditingController();
 
-  String get _endpoint =>
-      '${SettingsService.instance.backendBaseUrl}/text-to-sign';
+  String get _endpoint => '${AppConfig.backendBaseUrl}/text-to-sign';
 
   List<String> _signIds = [];
   bool _isTranslating = false;

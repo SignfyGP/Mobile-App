@@ -6,6 +6,7 @@ import 'package:flutter_3d_controller/flutter_3d_controller.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:signfy/core/constants/app_config.dart';
 import 'package:signfy/core/constants/colors.dart';
 import 'package:signfy/core/constants/strings.dart';
 import 'package:signfy/core/services/settings_service.dart';
@@ -25,7 +26,7 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
   final Flutter3DController _avatarController = Flutter3DController();
 
   String get _backendEndpoint =>
-      '${SettingsService.instance.backendBaseUrl}/speech-to-skeleton-video';
+      '${AppConfig.backendBaseUrl}/speech-to-skeleton-video';
 
   String? _recordedFilePath;
   String? _transcribedText;

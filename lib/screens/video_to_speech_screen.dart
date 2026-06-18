@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:signfy/core/constants/app_config.dart';
 import 'package:signfy/core/constants/strings.dart';
 import 'package:signfy/core/services/settings_service.dart';
 import 'package:video_player/video_player.dart';
@@ -20,8 +21,7 @@ class VideoToSpeechPage extends StatefulWidget {
 class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
   final AudioPlayer _audioPlayer = AudioPlayer();
 
-  String get _backendEndpoint =>
-      '${SettingsService.instance.backendBaseUrl}/video-to-speech';
+  String get _backendEndpoint => '${AppConfig.backendBaseUrl}/video-to-speech';
 
   VideoPlayerController? _videoController;
   String? _recordedVideoPath;
