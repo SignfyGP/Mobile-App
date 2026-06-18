@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:signfy/core/constants/colors.dart';
+import 'package:signfy/core/constants/strings.dart';
 import 'package:signfy/screens/avatar_screen.dart';
 import 'package:signfy/screens/settings_screen.dart';
 import 'package:signfy/screens/speech_to_video_screen.dart';
@@ -10,11 +11,23 @@ import 'package:signfy/widgets/home_header.dart';
 import 'package:signfy/widgets/section_label.dart';
 import 'package:signfy/widgets/translation_card.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
   void _go(BuildContext context, Widget screen) {
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+  }
+
+  void _goSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    ).then((_) => setState(() {}));
   }
 
   @override
@@ -33,19 +46,19 @@ class HomePage extends StatelessWidget {
                 children: [
                   const Expanded(child: HomeHeader()),
                   IconButton(
-                    onPressed: () => _go(context, const SettingsScreen()),
+                    onPressed: _goSettings,
                     icon: const Icon(Icons.settings_outlined),
                     color: AppColors.secondaryText,
-                    tooltip: 'Settings',
+                    tooltip: S.settingsTooltip,
                   ),
                 ],
               ),
               const SizedBox(height: 40),
-              const SectionLabel('Translation Modes'),
+              SectionLabel(S.translationModes),
               const SizedBox(height: 16),
               TranslationCard(
-                title: 'Speech to Sign',
-                subtitle: 'Speak or type — watch the avatar sign it back',
+                title: S.speechToSign,
+                subtitle: S.speechToSignSub,
                 iconTop: Icons.mic_rounded,
                 iconBottom: Icons.sign_language_rounded,
                 gradientColors: const [Color(0xFF0077A8), Color(0xFF004D70)],
@@ -54,8 +67,8 @@ class HomePage extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               TranslationCard(
-                title: 'Text to Sign',
-                subtitle: 'Type any text — watch the avatar sign each word',
+                title: S.textToSign,
+                subtitle: S.textToSignSub,
                 iconTop: Icons.keyboard_rounded,
                 iconBottom: Icons.sign_language_rounded,
                 gradientColors: const [Color(0xFF065F46), Color(0xFF047857)],
@@ -64,8 +77,8 @@ class HomePage extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               TranslationCard(
-                title: 'Sign to Speech',
-                subtitle: 'Show your hands — get spoken words back',
+                title: S.signToSpeech,
+                subtitle: S.signToSpeechSub,
                 iconTop: Icons.sign_language_rounded,
                 iconBottom: Icons.volume_up_rounded,
                 gradientColors: const [Color(0xFF5B21B6), Color(0xFF3B0764)],
@@ -73,7 +86,7 @@ class HomePage extends StatelessWidget {
                 onTap: () => _go(context, const VideoToSpeechPage()),
               ),
               const SizedBox(height: 32),
-              const SectionLabel('Explore'),
+              SectionLabel(S.explore),
               const SizedBox(height: 16),
               ExploreCard(
                 onTap: () => _go(context, const ViewerPage()),

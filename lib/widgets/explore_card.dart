@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:signfy/core/constants/colors.dart';
+import 'package:signfy/core/constants/strings.dart';
 
 class ExploreCard extends StatelessWidget {
   const ExploreCard({super.key, required this.onTap});
@@ -58,23 +59,23 @@ class ExploreCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 18),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            '3D Avatar Demo',
-                            style: TextStyle(
+                            S.avatarDemoTitle,
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
-                            'Explore sign animations interactively',
-                            style: TextStyle(
+                            S.avatarDemoSub,
+                            style: const TextStyle(
                               fontSize: 12,
                               color: AppColors.secondaryText,
                             ),

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:signfy/core/constants/colors.dart';
+import 'package:signfy/core/constants/strings.dart';
 import 'package:signfy/core/services/settings_service.dart';
 
 const _cyan = AppColors.cyan;
@@ -64,7 +65,7 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
     if (!hasPermission) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Microphone permission is required.')),
+        SnackBar(content: Text(S.micPermission)),
       );
       return;
     }
@@ -72,7 +73,7 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
     final tempDir = await getTemporaryDirectory();
     final path =
         '${tempDir.path}/speech_${DateTime.now().millisecondsSinceEpoch}.wav';
-        
+
     await _audioRecorder.start(
       const RecordConfig(encoder: AudioEncoder.wav),
       path: path,
@@ -112,6 +113,7 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
     try {
       final request = http.MultipartRequest('POST', Uri.parse(_backendEndpoint))
         ..headers['accept'] = 'application/json'
+        ..fields['language'] = SettingsService.instance.appLanguage
         ..files.add(
           await http.MultipartFile.fromPath(
             'speech_file',
@@ -147,9 +149,9 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
       await _playAvatarAnimations(ids);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Translation failed: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(S.translationFailed(error))),
+      );
     } finally {
       if (mounted) setState(() => _isTranslating = false);
     }
@@ -186,9 +188,10 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
   Widget build(BuildContext context) {
     final busy = _isTranslating || _isPlaying;
     final hasRecording = _recordedFilePath != null;
+    final isArabic = SettingsService.instance.appLanguage == 'ar';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Speech to Sign')),
+      appBar: AppBar(title: Text(S.speechToSignTitle)),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         child: Column(
@@ -210,7 +213,7 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
                       enableTouch: true,
                       controller: _avatarController,
                       src: 'assets/models/sign_avatar.glb',
-                    ),
+                      ),
                   ],
                 ),
               ),
@@ -218,7 +221,7 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
 
             if (_transcribedText != null) ...[
               const SizedBox(height: 10),
-              _TranscriptionCard(text: _transcribedText!),
+              _TranscriptionCard(text: _transcribedText!, isArabic: isArabic),
             ],
 
             if (_signIds.isNotEmpty) ...[
@@ -255,14 +258,14 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
                       ),
                     )
                   : _isPlaying
-                  ? const Icon(Icons.sign_language_rounded)
-                  : const Icon(Icons.translate_rounded),
+                      ? const Icon(Icons.sign_language_rounded)
+                      : const Icon(Icons.translate_rounded),
               label: Text(
                 _isTranslating
-                    ? 'Translating…'
+                    ? S.translating
                     : _isPlaying
-                    ? 'Signing…'
-                    : 'Translate to Sign',
+                        ? S.signingEllipsis
+                        : S.translateToSign,
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               style: ElevatedButton.styleFrom(
@@ -295,7 +298,7 @@ class _IdleHint extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Record your voice below and tap Translate',
+            S.recordHint,
             style: TextStyle(
               fontSize: 13,
               color: AppColors.secondaryText.withValues(alpha: 0.5),
@@ -323,7 +326,7 @@ class _RecordingHint extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Listening…',
+            S.listening,
             style: TextStyle(
               fontSize: 13,
               color: Colors.redAccent.withValues(alpha: 0.7),
@@ -348,18 +351,18 @@ class _SigningBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _cyan.withValues(alpha: 0.4)),
       ),
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
+          const SizedBox(
             width: 8,
             height: 8,
             child: CircularProgressIndicator(strokeWidth: 1.5, color: _cyan),
           ),
-          SizedBox(width: 6),
+          const SizedBox(width: 6),
           Text(
-            'Signing',
-            style: TextStyle(
+            S.signing,
+            style: const TextStyle(
               fontSize: 12,
               color: _cyan,
               fontWeight: FontWeight.w600,
@@ -372,8 +375,9 @@ class _SigningBadge extends StatelessWidget {
 }
 
 class _TranscriptionCard extends StatelessWidget {
-  const _TranscriptionCard({required this.text});
+  const _TranscriptionCard({required this.text, required this.isArabic});
   final String text;
+  final bool isArabic;
 
   @override
   Widget build(BuildContext context) {
@@ -391,6 +395,9 @@ class _TranscriptionCard extends StatelessWidget {
           Expanded(
             child: Text(
               text,
+              textDirection:
+                  isArabic ? TextDirection.rtl : TextDirection.ltr,
+              textAlign: isArabic ? TextAlign.right : TextAlign.left,
               style: const TextStyle(fontSize: 14, color: Colors.white),
             ),
           ),
@@ -431,7 +438,7 @@ class _AudioPlaybackRow extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Text(
-              isPlaying ? 'Stop playback' : 'Play recorded audio',
+              isPlaying ? S.stopPlayback : S.playRecordedAudio,
               style: const TextStyle(
                 fontSize: 14,
                 color: Colors.white,

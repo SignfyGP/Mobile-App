@@ -5,9 +5,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_3d_controller/flutter_3d_controller.dart';
 import 'package:http/http.dart' as http;
 import 'package:signfy/core/constants/colors.dart';
+import 'package:signfy/core/constants/strings.dart';
 import 'package:signfy/core/services/settings_service.dart';
 
 const _cyan = AppColors.cyan;
+
+final _arabicRegex = RegExp(r'[؀-ۿݐ-ݿࢠ-ࣿ0-9\s،؟.!]+');
 
 class TextToSignPage extends StatefulWidget {
   const TextToSignPage({super.key});
@@ -65,9 +68,8 @@ class _TextToSignPageState extends State<TextToSignPage> {
       }
 
       final raw = decoded['sign_ids'];
-      final ids = raw is List
-          ? raw.map((e) => e.toString()).toList()
-          : <String>[];
+      final ids =
+          raw is List ? raw.map((e) => e.toString()).toList() : <String>[];
 
       if (!mounted) return;
       setState(() => _signIds = ids);
@@ -75,9 +77,9 @@ class _TextToSignPageState extends State<TextToSignPage> {
       await _playAnimations(ids);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Translation failed: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(S.translationFailed(error))),
+      );
     } finally {
       if (mounted) setState(() => _isTranslating = false);
     }
@@ -115,9 +117,10 @@ class _TextToSignPageState extends State<TextToSignPage> {
   @override
   Widget build(BuildContext context) {
     final busy = _isTranslating || _isPlaying;
+    final isArabic = SettingsService.instance.appLanguage == 'ar';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Text to Sign')),
+      appBar: AppBar(title: Text(S.textToSignTitle)),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         child: Column(
@@ -142,7 +145,7 @@ class _TextToSignPageState extends State<TextToSignPage> {
                       enableTouch: true,
                       controller: _avatarController,
                       src: 'assets/models/sign_avatar.glb',
-                    ),
+                      ),
                   ],
                 ),
               ),
@@ -157,26 +160,25 @@ class _TextToSignPageState extends State<TextToSignPage> {
 
             TextField(
               controller: _textController,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(
-                  RegExp(
-                    r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF0-9\s،؟.!]+',
-                  ),
-                ),
-              ],
-              textDirection: TextDirection.rtl,
-              textAlign: TextAlign.right,
+              inputFormatters: isArabic
+                  ? [FilteringTextInputFormatter.allow(_arabicRegex)]
+                  : null,
+              textDirection:
+                  isArabic ? TextDirection.rtl : TextDirection.ltr,
+              textAlign: isArabic ? TextAlign.right : TextAlign.left,
               keyboardType: TextInputType.text,
               minLines: 2,
               maxLines: 4,
               textCapitalization: TextCapitalization.sentences,
               style: const TextStyle(fontSize: 15, color: Colors.white),
               decoration: InputDecoration(
-                hintText: 'Type text to translate into sign language…',
+                hintText: S.textHint,
                 hintStyle: const TextStyle(
                   color: AppColors.secondaryText,
                   fontSize: 14,
                 ),
+                hintTextDirection:
+                    isArabic ? TextDirection.rtl : TextDirection.ltr,
                 filled: true,
                 fillColor: AppColors.cardDark,
                 contentPadding: const EdgeInsets.all(14),
@@ -211,6 +213,7 @@ class _TextToSignPageState extends State<TextToSignPage> {
 
             const SizedBox(height: 10),
 
+            // ── Translate button ───────────────────────────────────────────
             ElevatedButton.icon(
               onPressed: busy ? null : _translate,
               icon: _isTranslating
@@ -223,14 +226,14 @@ class _TextToSignPageState extends State<TextToSignPage> {
                       ),
                     )
                   : _isPlaying
-                  ? const Icon(Icons.sign_language_rounded)
-                  : const Icon(Icons.translate_rounded),
+                      ? const Icon(Icons.sign_language_rounded)
+                      : const Icon(Icons.translate_rounded),
               label: Text(
                 _isTranslating
-                    ? 'Translating…'
+                    ? S.translating
                     : _isPlaying
-                    ? 'Signing…'
-                    : 'Translate to Sign',
+                        ? S.signingEllipsis
+                        : S.translateToSign,
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               style: ElevatedButton.styleFrom(
@@ -263,7 +266,7 @@ class _IdleHint extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Type text below and tap Translate',
+            S.textIdleHint,
             style: TextStyle(
               fontSize: 13,
               color: AppColors.secondaryText.withValues(alpha: 0.5),
@@ -287,18 +290,21 @@ class _SigningBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _cyan.withValues(alpha: 0.4)),
       ),
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
+          const SizedBox(
             width: 8,
             height: 8,
-            child: CircularProgressIndicator(strokeWidth: 1.5, color: _cyan),
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              color: _cyan,
+            ),
           ),
-          SizedBox(width: 6),
+          const SizedBox(width: 6),
           Text(
-            'Signing',
-            style: TextStyle(
+            S.signing,
+            style: const TextStyle(
               fontSize: 12,
               color: _cyan,
               fontWeight: FontWeight.w600,

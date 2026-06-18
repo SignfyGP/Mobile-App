@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:signfy/core/constants/app_config.dart';
 import 'package:signfy/core/constants/colors.dart';
+import 'package:signfy/core/constants/strings.dart';
 import 'package:signfy/core/services/settings_service.dart';
 import 'package:signfy/widgets/section_label.dart';
 import '../widgets/info_row.dart';
@@ -19,10 +20,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final TextEditingController _urlController;
   _ConnStatus _connStatus = _ConnStatus.idle;
   bool _hasChanges = false;
+  late String _language;
 
   @override
   void initState() {
     super.initState();
+    _language = SettingsService.instance.appLanguage;
     _urlController = TextEditingController(
       text: SettingsService.instance.backendBaseUrl,
     );
@@ -66,11 +69,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _save() async {
     final url = _urlController.text.trim();
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('URL must start with http:// or https://'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(S.urlValidationError)));
       return;
     }
 
@@ -79,7 +80,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _hasChanges = false);
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Settings saved')));
+    ).showSnackBar(SnackBar(content: Text(S.settingsSaved)));
+  }
+
+  Future<void> _setLanguage(String lang) async {
+    await SettingsService.instance.setAppLanguage(lang);
+    if (!mounted) return;
+    setState(() => _language = lang);
   }
 
   Future<void> _resetToDefaults() async {
@@ -89,29 +96,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _hasChanges = false;
       _connStatus = _ConnStatus.idle;
+      _language = SettingsService.instance.appLanguage;
     });
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Reset to defaults')));
+    ).showSnackBar(SnackBar(content: Text(S.resetDone)));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bg,
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(S.settings)),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const SectionLabel('Backend'),
+          SectionLabel(S.backend),
           const SizedBox(height: 12),
           _SettingsCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Base URL',
-                  style: TextStyle(
+                Text(
+                  S.baseUrl,
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppColors.secondaryText,
@@ -174,7 +182,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           )
                         : const Icon(Icons.wifi_tethering_rounded, size: 18),
-                    label: const Text('Test Connection'),
+                    label: Text(S.testConnection),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.cyan,
                       side: const BorderSide(color: AppColors.cardBorder),
@@ -191,16 +199,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          const SectionLabel('About'),
+          SectionLabel(S.language),
+          const SizedBox(height: 12),
+          _SettingsCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  S.translationLanguage,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.secondaryText,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _LanguageToggle(selected: _language, onSelect: _setLanguage),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          SectionLabel(S.about),
           const SizedBox(height: 12),
           _SettingsCard(
             child: Column(
               children: [
-                InfoRow(label: 'App', value: AppConfig.appName),
+                InfoRow(label: S.appLabel, value: AppConfig.appName),
                 const _Divider(),
-                const InfoRow(label: 'Version', value: '1.0.0'),
+                InfoRow(label: S.version, value: '1.0.0'),
                 const _Divider(),
-                InfoRow(label: 'Description', value: AppConfig.description),
+                InfoRow(label: S.description, value: AppConfig.description),
               ],
             ),
           ),
@@ -215,7 +244,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     side: const BorderSide(color: Color(0xFF3A2020)),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: const Text('Reset to Defaults'),
+                  child: Text(S.resetToDefaults),
                 ),
               ),
               const SizedBox(width: 12),
@@ -228,9 +257,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     disabledBackgroundColor: AppColors.cardBorder,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: const Text(
-                    'Save',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                  child: Text(
+                    S.save,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -295,7 +324,7 @@ class _ConnStatusBanner extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            isSuccess ? 'Server is reachable' : 'Could not reach server',
+            isSuccess ? S.serverReachable : S.serverUnreachable,
             style: TextStyle(
               fontSize: 13,
               color: isSuccess ? const Color(0xFF22C55E) : Colors.redAccent,
@@ -312,11 +341,7 @@ class _Divider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Divider(
-      color: AppColors.cardBorder,
-      height: 1,
-      thickness: 1,
-    );
+    return const Divider(color: AppColors.cardBorder, height: 1, thickness: 1);
   }
 }
 
@@ -334,6 +359,93 @@ class _SettingsCard extends StatelessWidget {
         border: Border.all(color: AppColors.cardBorder, width: 1),
       ),
       child: child,
+    );
+  }
+}
+
+class _LanguageToggle extends StatelessWidget {
+  const _LanguageToggle({required this.selected, required this.onSelect});
+  final String selected;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _LangOption(
+          code: 'ar',
+          label: 'العربية',
+          selected: selected == 'ar',
+          onTap: () => onSelect('ar'),
+        ),
+        const SizedBox(width: 10),
+        _LangOption(
+          code: 'en',
+          label: 'English',
+          selected: selected == 'en',
+          onTap: () => onSelect('en'),
+        ),
+      ],
+    );
+  }
+}
+
+class _LangOption extends StatelessWidget {
+  const _LangOption({
+    required this.code,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+  final String code;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.cyan.withValues(alpha: 0.12)
+                : AppColors.bg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected ? AppColors.cyan : AppColors.cardBorder,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                  color: selected ? AppColors.cyan : AppColors.secondaryText,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                code.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 10,
+                  letterSpacing: 1,
+                  color: selected
+                      ? AppColors.cyan.withValues(alpha: 0.7)
+                      : AppColors.secondaryText.withValues(alpha: 0.5),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

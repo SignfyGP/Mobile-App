@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsService {
   static const _keyBackendUrl = 'backend_base_url';
+  static const _keyLanguage = 'app_language';
 
   static SettingsService? _instance;
   static SettingsService get instance => _instance!;
@@ -27,5 +28,13 @@ class SettingsService {
   Future<void> setBackendBaseUrl(String url) =>
       _prefs.setString(_keyBackendUrl, url);
 
-  Future<void> resetToDefaults() => _prefs.remove(_keyBackendUrl);
+  String get appLanguage => _prefs.getString(_keyLanguage) ?? 'ar';
+
+  Future<void> setAppLanguage(String lang) =>
+      _prefs.setString(_keyLanguage, lang);
+
+  Future<void> resetToDefaults() async {
+    await _prefs.remove(_keyBackendUrl);
+    await _prefs.remove(_keyLanguage);
+  }
 }
