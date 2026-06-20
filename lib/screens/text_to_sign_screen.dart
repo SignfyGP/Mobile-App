@@ -144,7 +144,7 @@ class _TextToSignPageState extends State<TextToSignPage> {
                       progressBarColor: _cyan,
                       enableTouch: true,
                       controller: _avatarController,
-                      src: 'assets/models/sign_avatar.glb',
+                      src: 'assets/models/kate_signs.glb',
                       ),
                   ],
                 ),

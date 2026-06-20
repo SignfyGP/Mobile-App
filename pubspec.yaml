@@ -78,6 +78,8 @@ flutter:
     - assets/models/hero.glb
     - assets/models/model.glb
     - assets/models/sign_avatar.glb
+    - assets/models/ramy_signs.glb
+    - assets/models/kate_signs.glb
 
 flutter_launcher_icons:
   android: true
