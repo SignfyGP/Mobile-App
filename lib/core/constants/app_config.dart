@@ -1,5 +1,3 @@
-import 'dart:io';
-
 class AppConfig {
   static const String appName = "Signfy";
   static const String logo = "assets/images/logo.png";

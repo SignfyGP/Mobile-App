@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:signfy/core/constants/colors.dart';
 import 'package:signfy/core/constants/strings.dart';
+import 'package:signfy/screens/about_help_screen.dart';
 import 'package:signfy/screens/avatar_screen.dart';
 import 'package:signfy/screens/settings_screen.dart';
 import 'package:signfy/screens/speech_to_video_screen.dart';
@@ -45,6 +46,13 @@ class _HomePageState extends State<HomePage> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const Expanded(child: HomeHeader()),
+                  IconButton(
+                    onPressed: () =>
+                        _go(context, const AboutHelpScreen()),
+                    icon: const Icon(Icons.help_outline_rounded),
+                    color: AppColors.secondaryText,
+                    tooltip: S.aboutHelpTooltip,
+                  ),
                   IconButton(
                     onPressed: _goSettings,
                     icon: const Icon(Icons.settings_outlined),
