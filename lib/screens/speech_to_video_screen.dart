@@ -25,8 +25,8 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final Flutter3DController _avatarController = Flutter3DController();
 
-  String get _backendEndpoint =>
-      '${AppConfig.backendBaseUrl}/speech-to-skeleton-video';
+  String get _transcribeEndpoint => '${AppConfig.backendBaseUrl}/v1/speech/transcribe';
+  String get _text2glossEndpoint =>'${AppConfig.backendBaseUrl}/v1/gloss';
 
   String? _recordedFilePath;
   String? _transcribedText;
@@ -101,6 +101,68 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
     setState(() => _isPlayingAudio = true);
   }
 
+  Future<String?> _transcribeAudio(String filePath) async {
+  try {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse(_transcribeEndpoint),
+    );
+
+    request.headers['accept'] = 'application/json';
+
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'file', // Must match FastAPI parameter name
+        filePath,
+        contentType: http.MediaType('audio', 'wav'),
+      ),
+    );
+
+    final streamedResponse = await request.send();
+    final response =
+        await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode != 200) {
+      throw Exception(
+          'Transcribe server returned ${response.statusCode}');
+    }
+
+    final decodedJson = jsonDecode(response.body);
+    return decodedJson['text']?.toString();
+  } catch (e) {
+    rethrow;
+  }
+}
+
+  Future<List<String>> _textToGlosses(String text) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse(_text2glossEndpoint),
+            headers: {
+              'Content-Type': 'application/json',
+              'accept': 'application/json',
+            },
+            body: jsonEncode({'text': text}),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode != 200) {
+        throw Exception('Text-to-gloss server returned ${response.statusCode}');
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Unexpected text-to-sign response format');
+      }
+
+      final raw = decoded['glosses'];
+      return raw is List ? raw.map((e) => e.toString()).toList() : <String>[];
+    } catch (error) {
+      rethrow;
+    }
+  }
+
   Future<void> _translateToSign() async {
     final recordedFilePath = _recordedFilePath;
     if (recordedFilePath == null) return;
@@ -112,42 +174,19 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
     });
 
     try {
-      final request = http.MultipartRequest('POST', Uri.parse(_backendEndpoint))
-        ..headers['accept'] = 'application/json'
-        ..fields['language'] = SettingsService.instance.appLanguage
-        ..files.add(
-          await http.MultipartFile.fromPath(
-            'speech_file',
-            recordedFilePath,
-            filename: 'speech.wav',
-          ),
-        );
-
-      final streamedResponse = await request.send();
-      if (streamedResponse.statusCode < 200 ||
-          streamedResponse.statusCode >= 300) {
-        throw Exception('Server returned ${streamedResponse.statusCode}');
+      final transcript = await _transcribeAudio(recordedFilePath);
+      if (transcript == null || transcript.isEmpty) {
+        throw Exception('No transcript received');
       }
-
-      final response = await http.Response.fromStream(streamedResponse);
-      final decodedJson = jsonDecode(response.body);
-      if (decodedJson is! Map<String, dynamic>) {
-        throw Exception('Unexpected response format');
-      }
-
-      final transcribedText = decodedJson['transcribed_text']?.toString();
-      final signIds = decodedJson['sign_ids'];
-      final ids = signIds is List
-          ? signIds.map((id) => id.toString()).toList()
-          : <String>[];
 
       if (!mounted) return;
-      setState(() {
-        _transcribedText = transcribedText;
-        _signIds = ids;
-      });
+      setState(() => _transcribedText = transcript);
+      final signIds = await _textToGlosses(transcript);
 
-      await _playAvatarAnimations(ids);
+      if (!mounted) return;
+      setState(() => _signIds = signIds);
+
+      await _playAvatarAnimations(signIds);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
