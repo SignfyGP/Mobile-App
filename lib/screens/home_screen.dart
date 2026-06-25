@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:signfy/core/constants/colors.dart';
 import 'package:signfy/core/constants/strings.dart';
 import 'package:signfy/screens/about_help_screen.dart';
-import 'package:signfy/screens/avatar_screen.dart';
 import 'package:signfy/screens/settings_screen.dart';
 import 'package:signfy/screens/speech_to_video_screen.dart';
 import 'package:signfy/screens/text_to_sign_screen.dart';
 import 'package:signfy/screens/video_to_speech_screen.dart';
-import 'package:signfy/widgets/explore_card.dart';
 import 'package:signfy/widgets/home_header.dart';
 import 'package:signfy/widgets/section_label.dart';
 import 'package:signfy/widgets/translation_card.dart';
@@ -92,12 +90,6 @@ class _HomePageState extends State<HomePage> {
                 gradientColors: const [Color(0xFF5B21B6), Color(0xFF3B0764)],
                 accentColor: AppColors.purple,
                 onTap: () => _go(context, const VideoToSpeechPage()),
-              ),
-              const SizedBox(height: 32),
-              SectionLabel(S.explore),
-              const SizedBox(height: 16),
-              ExploreCard(
-                onTap: () => _go(context, const ViewerPage()),
               ),
               const SizedBox(height: 32),
             ],

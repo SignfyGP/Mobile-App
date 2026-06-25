@@ -15,7 +15,6 @@ class S {
   // ── Home ──────────────────────────────────────────────────────────────────
   static String get translationModes =>
       _ar ? 'أوضاع الترجمة' : 'Translation Modes';
-  static String get explore => _ar ? 'استكشف' : 'Explore';
   static String get settingsTooltip => _ar ? 'الإعدادات' : 'Settings';
 
   static String get speechToSign => _ar ? 'كلام إلى إشارة' : 'Speech to Sign';
@@ -32,12 +31,6 @@ class S {
   static String get signToSpeechSub => _ar
       ? 'أرِ يديك واحصل على كلام مسموع'
       : 'Show your hands — get spoken words back';
-
-  static String get avatarDemoTitle =>
-      _ar ? 'عرض الصورة الرمزية ثلاثية الأبعاد' : '3D Avatar Demo';
-  static String get avatarDemoSub => _ar
-      ? 'استكشف حركات الإشارة بشكل تفاعلي'
-      : 'Explore sign animations interactively';
 
   // ── Settings ──────────────────────────────────────────────────────────────
   static String get settings => _ar ? 'الإعدادات' : 'Settings';
