@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:signfy/core/constants/colors.dart';
+import 'package:signfy/core/constants/app_config.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key, required this.nextScreen});
@@ -70,7 +71,7 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
                 const SizedBox(height: 24),
                 const Text(
-                  'signfy',
+                  AppConfig.appName,
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,

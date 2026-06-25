@@ -128,8 +128,8 @@ class S {
   static String get aboutHelp => _ar ? 'حول والمساعدة' : 'About & Help';
   static String get aboutHelpTooltip => _ar ? 'حول والمساعدة' : 'About & Help';
   static String get aboutIntro => _ar
-      ? 'سيجنفاي تطبيق لترجمة لغة الإشارة العربية في الاتجاهين. حوّل الكلام أو النص إلى إشارات تؤديها صورة رمزية ثلاثية الأبعاد، أو ترجم إشارات الفيديو إلى كلام ونص.'
-      : 'Signfy is a bidirectional Arabic Sign Language translator. Turn speech or text into signs performed by a 3D avatar, or translate signed video back into speech and text.';
+      ? 'سيجنيفاي تطبيق لترجمة لغة الإشارة العربية في الاتجاهين. حوّل الكلام أو النص إلى إشارات تؤديها صورة رمزية ثلاثية الأبعاد، أو ترجم إشارات الفيديو إلى كلام ونص.'
+      : 'Signify is a bidirectional Arabic Sign Language translator. Turn speech or text into signs performed by a 3D avatar, or translate signed video back into speech and text.';
   static String get howToUse => _ar ? 'كيفية الاستخدام' : 'How to Use';
 
   static String get helpSpeechTitle =>
@@ -165,7 +165,7 @@ class S {
   static String get getStarted => _ar ? 'ابدأ الآن' : 'Get Started';
 
   static String get onboardWelcomeTitle =>
-      _ar ? 'مرحباً بك في سيجنفاي' : 'Welcome to Signfy';
+      _ar ? 'مرحباً بك في سيجنيفاي' : 'Welcome to Signify';
   static String get onboardWelcomeBody => _ar
       ? 'مترجم لغة الإشارة العربية في الاتجاهين — يربط بين الكلام والنص ولغة الإشارة.'
       : 'A bidirectional Arabic Sign Language translator — bridging speech, text, and sign.';
