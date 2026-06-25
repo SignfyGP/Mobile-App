@@ -186,4 +186,13 @@ class S {
   static String get gradProject => _ar ? 'مشروع تخرّج' : 'Graduation Project';
   static String get madeWith =>
       _ar ? 'صُمّم باستخدام فلاتر' : 'Built with Flutter';
+
+  static String get teamTitle => _ar ? 'فريق العمل' : 'Team';
+  static List<String> get teamMembers => _ar
+      ? const ['مصطفى ربيع', 'علي بحر', 'محمد عمرو', 'محمد خالد']
+      : const ['Mostafa Rabie', 'Ali Bahr', 'Mohamed Amr', 'Mohamed Khaled'];
+
+  static String get supervisorTitle => _ar ? 'إشراف' : 'Supervisor';
+  static String get supervisorName =>
+      _ar ? 'أ.د. نيفين درويش' : 'Prof. Nevin Darwish';
 }

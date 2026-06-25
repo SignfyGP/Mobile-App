@@ -92,6 +92,16 @@ class AboutHelpScreen extends StatelessWidget {
                     color: AppColors.secondaryText,
                   ),
                 ),
+                const SizedBox(height: 18),
+                _CreditsGroup(
+                  title: S.teamTitle,
+                  names: S.teamMembers,
+                ),
+                const SizedBox(height: 16),
+                _CreditsGroup(
+                  title: S.supervisorTitle,
+                  names: [S.supervisorName],
+                ),
               ],
             ),
           ),
@@ -220,6 +230,42 @@ class _TipRow extends StatelessWidget {
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+class _CreditsGroup extends StatelessWidget {
+  const _CreditsGroup({required this.title, required this.names});
+  final String title;
+  final List<String> names;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1,
+            color: AppColors.cyan,
+          ),
+        ),
+        const SizedBox(height: 8),
+        for (final name in names)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Text(
+              name,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.white,
+              ),
+            ),
+          ),
       ],
     );
   }
