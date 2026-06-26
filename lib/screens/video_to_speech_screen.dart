@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
@@ -6,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:signfy/core/constants/app_config.dart';
 import 'package:signfy/core/constants/strings.dart';
 import 'package:signfy/core/services/settings_service.dart';
 import 'package:video_player/video_player.dart';
@@ -21,7 +21,9 @@ class VideoToSpeechPage extends StatefulWidget {
 class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
   final AudioPlayer _audioPlayer = AudioPlayer();
 
-  String get _backendEndpoint => '${AppConfig.backendBaseUrl}/video-to-speech';
+  static const String _apiBaseUrl = 'http://16.16.174.165:8000/api/v1';
+  String get _signToTextEndpoint => '$_apiBaseUrl/sign-to-text/recognize';
+  String get _textToSpeechEndpoint => '$_apiBaseUrl/text-to-speech/synthesize';
 
   VideoPlayerController? _videoController;
   String? _recordedVideoPath;
@@ -50,6 +52,7 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
   Future<void> _initializeVideo(String videoPath) async {
     _videoController?.dispose();
     _videoController = VideoPlayerController.file(File(videoPath))
+      ..addListener(_onVideoTick)
       ..initialize().then((_) {
         if (!mounted) return;
         setState(() {
@@ -62,6 +65,15 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
           SnackBar(content: Text(S.videoError(error))),
         );
       });
+  }
+
+  void _onVideoTick() {
+    final controller = _videoController;
+    if (controller == null || !controller.value.isInitialized) return;
+    final isPlaying = controller.value.isPlaying;
+    if (isPlaying != _isPlayingVideo && mounted) {
+      setState(() => _isPlayingVideo = isPlaying);
+    }
   }
 
   Future<void> _recordNewVideo() async {
@@ -141,37 +153,18 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
     setState(() => _isTranslating = true);
 
     try {
-      final request = http.MultipartRequest('POST', Uri.parse(_backendEndpoint))
-        ..headers['accept'] = 'application/json'
-        ..files.add(await http.MultipartFile.fromPath(
-          'video_file',
-          recordedVideoPath,
-          filename: 'video.mp4',
-        ));
+      final recognizedText = await _recognizeSignText(recordedVideoPath);
 
-      final streamedResponse = await request.send();
-      if (streamedResponse.statusCode < 200 ||
-          streamedResponse.statusCode >= 300) {
-        throw Exception('Server returned ${streamedResponse.statusCode}');
-      }
+      if (!mounted) return;
+      setState(() => _translatedText = recognizedText);
 
-      final responseBytes = await streamedResponse.stream.toBytes();
-      final tempDir = await getTemporaryDirectory();
-      final outputPath =
-          '${tempDir.path}/speech_${DateTime.now().millisecondsSinceEpoch}.wav';
-      final outputFile = File(outputPath);
-      await outputFile.writeAsBytes(responseBytes, flush: true);
-
-      final encodedText = streamedResponse.headers['x-translated-text'];
-      final decodedText =
-          encodedText == null ? null : Uri.decodeComponent(encodedText);
+      final speechPath = await _synthesizeSpeech(recognizedText);
 
       await _audioPlayer.stop();
 
       if (!mounted) return;
       setState(() {
-        _generatedSpeechPath = outputFile.path;
-        _translatedText = decodedText;
+        _generatedSpeechPath = speechPath;
         _isPlayingSpeech = false;
       });
 
@@ -186,6 +179,66 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
     } finally {
       if (mounted) setState(() => _isTranslating = false);
     }
+  }
+
+  Future<String> _recognizeSignText(String videoPath) async {
+    final request =
+        http.MultipartRequest('POST', Uri.parse(_signToTextEndpoint))
+          ..headers['accept'] = 'application/json'
+          ..files.add(await http.MultipartFile.fromPath(
+            'file',
+            videoPath,
+            filename: 'video.mp4',
+            contentType: http.MediaType('video', 'mp4'),
+          ));
+
+    final response = await http.Response.fromStream(await request.send());
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      print(response.body);
+      throw Exception('Sign-to-text server returned ${response.statusCode}');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw Exception('Unexpected sign-to-text response format');
+    }
+
+    final text = (decoded['text'] ??
+            decoded['recognized_text'] ??
+            decoded['transcription'])
+        ?.toString();
+    if (text == null || text.isEmpty) {
+      throw Exception('No text recognized from video');
+    }
+    return text;
+  }
+
+  Future<String> _synthesizeSpeech(String text) async {
+    final response = await http.post(
+      Uri.parse(_textToSpeechEndpoint),
+      headers: {
+        'Content-Type': 'application/json',
+        'accept': '*/*',
+      },
+      body: jsonEncode({'text': text}),
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Text-to-speech server returned ${response.statusCode}');
+    }
+
+    final contentType = response.headers['content-type'] ?? '';
+    final extension =
+        contentType.contains('mpeg') || contentType.contains('mp3')
+            ? 'mp3'
+            : 'wav';
+
+    final tempDir = await getTemporaryDirectory();
+    final outputPath =
+        '${tempDir.path}/speech_${DateTime.now().millisecondsSinceEpoch}.$extension';
+    final outputFile = File(outputPath);
+    await outputFile.writeAsBytes(response.bodyBytes, flush: true);
+    return outputFile.path;
   }
 
   Future<void> _toggleSpeechPlayback() async {
