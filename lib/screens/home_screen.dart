@@ -4,7 +4,6 @@ import 'package:signfy/core/constants/strings.dart';
 import 'package:signfy/screens/about_help_screen.dart';
 import 'package:signfy/screens/settings_screen.dart';
 import 'package:signfy/screens/speech_to_video_screen.dart';
-import 'package:signfy/screens/text_to_sign_screen.dart';
 import 'package:signfy/screens/video_to_speech_screen.dart';
 import 'package:signfy/widgets/home_header.dart';
 import 'package:signfy/widgets/section_label.dart';
@@ -70,16 +69,6 @@ class _HomePageState extends State<HomePage> {
                 gradientColors: const [Color(0xFF0077A8), Color(0xFF004D70)],
                 accentColor: AppColors.cyan,
                 onTap: () => _go(context, const SpeechToVideoPage()),
-              ),
-              const SizedBox(height: 16),
-              TranslationCard(
-                title: S.textToSign,
-                subtitle: S.textToSignSub,
-                iconTop: Icons.keyboard_rounded,
-                iconBottom: Icons.sign_language_rounded,
-                gradientColors: const [Color(0xFF065F46), Color(0xFF047857)],
-                accentColor: const Color(0xFF10B981),
-                onTap: () => _go(context, const TextToSignPage()),
               ),
               const SizedBox(height: 16),
               TranslationCard(

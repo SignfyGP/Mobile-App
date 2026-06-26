@@ -43,12 +43,6 @@ class AboutHelpScreen extends StatelessWidget {
                   body: S.helpSpeechBody,
                 ),
                 _HelpTile(
-                  icon: Icons.keyboard_rounded,
-                  accent: const Color(0xFF10B981),
-                  title: S.helpTextTitle,
-                  body: S.helpTextBody,
-                ),
-                _HelpTile(
                   icon: Icons.sign_language_rounded,
                   accent: AppColors.purple,
                   title: S.helpSignTitle,

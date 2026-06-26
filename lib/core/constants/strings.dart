@@ -22,11 +22,6 @@ class S {
       ? 'تحدّث وشاهد الصورة الرمزية تترجم'
       : 'Speak or type — watch the avatar sign it back';
 
-  static String get textToSign => _ar ? 'نص إلى إشارة' : 'Text to Sign';
-  static String get textToSignSub => _ar
-      ? 'اكتب أي نص وشاهد الصورة الرمزية تترجم'
-      : 'Type any text — watch the avatar sign each word';
-
   static String get signToSpeech => _ar ? 'إشارة إلى كلام' : 'Sign to Speech';
   static String get signToSpeechSub => _ar
       ? 'أرِ يديك واحصل على كلام مسموع'
@@ -71,15 +66,6 @@ class S {
       _ar ? 'تشغيل الصوت المسجل' : 'Play recorded audio';
   static String get micPermission =>
       _ar ? 'يلزم إذن الميكروفون.' : 'Microphone permission is required.';
-
-  // ── Text to Sign ──────────────────────────────────────────────────────────
-  static String get textToSignTitle => _ar ? 'نص إلى إشارة' : 'Text to Sign';
-  static String get textHint => _ar
-      ? 'اكتب نصاً للترجمة إلى لغة الإشارة…'
-      : 'Type text to translate into sign language…';
-  static String get textIdleHint => _ar
-      ? 'اكتب نصاً أدناه ثم اضغط ترجمة'
-      : 'Type text below and tap Translate';
 
   // ── Sign to Speech ────────────────────────────────────────────────────────
   static String get signToSpeechTitle =>
@@ -137,11 +123,6 @@ class S {
   static String get helpSpeechBody => _ar
       ? 'اضغط زر الميكروفون لتسجيل صوتك، ثم اضغط ترجمة. ستؤدي الصورة الرمزية الإشارات المقابلة.'
       : 'Tap the microphone to record your voice, then tap Translate. The avatar will perform the matching signs.';
-
-  static String get helpTextTitle => _ar ? 'نص إلى إشارة' : 'Text to Sign';
-  static String get helpTextBody => _ar
-      ? 'اكتب أي نص في الحقل ثم اضغط ترجمة لمشاهدة الصورة الرمزية توقّع كل كلمة.'
-      : 'Type any text in the field and tap Translate to watch the avatar sign each word.';
 
   static String get helpSignTitle => _ar ? 'إشارة إلى كلام' : 'Sign to Speech';
   static String get helpSignBody => _ar
