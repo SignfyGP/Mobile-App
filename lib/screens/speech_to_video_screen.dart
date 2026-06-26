@@ -201,7 +201,7 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
       setState(() => _transcribedText = transcript);
       final signIds = await _textToGlosses(transcript);
 
-      await _avatarController.playSequence(ids);
+      await _avatarController.playSequence(signIds);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
