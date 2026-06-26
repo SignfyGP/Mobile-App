@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:signfy/core/constants/strings.dart';
 import 'package:signfy/core/services/settings_service.dart';
+import 'package:signfy/screens/camera_recorder_screen.dart';
 import 'package:video_player/video_player.dart';
 
 class VideoToSpeechPage extends StatefulWidget {
@@ -53,18 +54,20 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
     _videoController?.dispose();
     _videoController = VideoPlayerController.file(File(videoPath))
       ..addListener(_onVideoTick)
-      ..initialize().then((_) {
-        if (!mounted) return;
-        setState(() {
-          _recordedVideoPath = videoPath;
-          _isPlayingVideo = false;
-        });
-      }).catchError((error) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(S.videoError(error))),
-        );
-      });
+      ..initialize()
+          .then((_) {
+            if (!mounted) return;
+            setState(() {
+              _recordedVideoPath = videoPath;
+              _isPlayingVideo = false;
+            });
+          })
+          .catchError((error) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(S.videoError(error))));
+          });
   }
 
   void _onVideoTick() {
@@ -81,31 +84,30 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(S.noCameraAvailable)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(S.noCameraAvailable)));
         return;
       }
 
       if (!mounted) return;
       final videoPath = await Navigator.push<String>(
         context,
-        MaterialPageRoute(
-            builder: (_) => CameraRecorderPage(camera: cameras[0])),
+        MaterialPageRoute(builder: (_) => CameraRecorderPage(cameras: cameras)),
       );
 
       if (videoPath != null) {
         await _initializeVideo(videoPath);
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(S.videoRecordedOk)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(S.videoRecordedOk)));
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(S.recordError(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(S.recordError(e))));
     }
   }
 
@@ -116,15 +118,15 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
       if (pickedFile != null) {
         await _initializeVideo(pickedFile.path);
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(S.videoLoadedOk)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(S.videoLoadedOk)));
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(S.selectError(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(S.selectError(e))));
     }
   }
 
@@ -144,9 +146,9 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
     if (recordedVideoPath == null ||
         _videoController == null ||
         !_videoController!.value.isInitialized) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(S.loadVideoFirst)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(S.loadVideoFirst)));
       return;
     }
 
@@ -168,14 +170,14 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
         _isPlayingSpeech = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(S.videoTranslatedOk)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(S.videoTranslatedOk)));
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(S.translationFailed(error))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(S.translationFailed(error))));
     } finally {
       if (mounted) setState(() => _isTranslating = false);
     }
@@ -185,12 +187,14 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
     final request =
         http.MultipartRequest('POST', Uri.parse(_signToTextEndpoint))
           ..headers['accept'] = 'application/json'
-          ..files.add(await http.MultipartFile.fromPath(
-            'file',
-            videoPath,
-            filename: 'video.mp4',
-            contentType: http.MediaType('video', 'mp4'),
-          ));
+          ..files.add(
+            await http.MultipartFile.fromPath(
+              'file',
+              videoPath,
+              filename: 'video.mp4',
+              contentType: http.MediaType('video', 'mp4'),
+            ),
+          );
 
     final response = await http.Response.fromStream(await request.send());
     if (response.statusCode != 200) {
@@ -202,10 +206,11 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
       throw Exception('Unexpected sign-to-text response format');
     }
 
-    final text = (decoded['text'] ??
-            decoded['recognized_text'] ??
-            decoded['transcription'])
-        ?.toString();
+    final text =
+        (decoded['text'] ??
+                decoded['recognized_text'] ??
+                decoded['transcription'])
+            ?.toString();
     if (text == null || text.isEmpty) {
       throw Exception('No text recognized from video');
     }
@@ -215,10 +220,7 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
   Future<String> _synthesizeSpeech(String text) async {
     final response = await http.post(
       Uri.parse(_textToSpeechEndpoint),
-      headers: {
-        'Content-Type': 'application/json',
-        'accept': '*/*',
-      },
+      headers: {'Content-Type': 'application/json', 'accept': '*/*'},
       body: jsonEncode({'text': text}),
     );
 
@@ -229,8 +231,8 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
     final contentType = response.headers['content-type'] ?? '';
     final extension =
         contentType.contains('mpeg') || contentType.contains('mp3')
-            ? 'mp3'
-            : 'wav';
+        ? 'mp3'
+        : 'wav';
 
     final tempDir = await getTemporaryDirectory();
     final outputPath =
@@ -259,8 +261,10 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
   @override
   Widget build(BuildContext context) {
     final isArabic = SettingsService.instance.appLanguage == 'ar';
-    final previewHeight =
-        (MediaQuery.of(context).size.height * 0.4).clamp(180.0, 360.0);
+    final previewHeight = (MediaQuery.of(context).size.height * 0.4).clamp(
+      180.0,
+      360.0,
+    );
 
     return Scaffold(
       appBar: AppBar(title: Text(S.signToSpeechTitle)),
@@ -279,7 +283,9 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
                       Text(
                         S.inputVideo,
                         style: const TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.w600),
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       _buildVideoPreview(previewHeight),
@@ -288,9 +294,11 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
                       const SizedBox(height: 8),
                       ElevatedButton.icon(
                         onPressed: _hasVideo ? _toggleVideoPlayback : null,
-                        icon: Icon(_hasVideo && _isPlayingVideo
-                            ? Icons.pause
-                            : Icons.play_arrow),
+                        icon: Icon(
+                          _hasVideo && _isPlayingVideo
+                              ? Icons.pause
+                              : Icons.play_arrow,
+                        ),
                         label: Text(
                           _hasVideo && _isPlayingVideo
                               ? S.pauseVideo
@@ -307,8 +315,9 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.language),
                         label: Text(
@@ -320,7 +329,9 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
                       Text(
                         S.generatedSpeech,
                         style: const TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.w600),
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       if (_translatedText != null) ...[
                         const SizedBox(height: 8),
@@ -337,9 +348,11 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
                         onPressed: _generatedSpeechPath == null
                             ? null
                             : _toggleSpeechPlayback,
-                        icon: Icon(_isPlayingSpeech
-                            ? Icons.stop_circle
-                            : Icons.play_arrow),
+                        icon: Icon(
+                          _isPlayingSpeech
+                              ? Icons.stop_circle
+                              : Icons.play_arrow,
+                        ),
                         label: Text(
                           _isPlayingSpeech
                               ? S.stopSpeech
@@ -379,8 +392,7 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
               : Center(
                   child: Text(
                     S.noVideoSelected,
-                    style:
-                        const TextStyle(fontSize: 16, color: Colors.white54),
+                    style: const TextStyle(fontSize: 16, color: Colors.white54),
                   ),
                 ),
         ),
@@ -412,107 +424,6 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
         const SizedBox(width: 8),
         Expanded(child: select),
       ],
-    );
-  }
-}
-
-class CameraRecorderPage extends StatefulWidget {
-  const CameraRecorderPage({super.key, required this.camera});
-  final CameraDescription camera;
-
-  @override
-  State<CameraRecorderPage> createState() => _CameraRecorderPageState();
-}
-
-class _CameraRecorderPageState extends State<CameraRecorderPage> {
-  late final CameraController _cameraController;
-  late final Future<void> _initFuture;
-  bool _isRecording = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _cameraController =
-        CameraController(widget.camera, ResolutionPreset.high);
-    _initFuture = _cameraController.initialize();
-  }
-
-  @override
-  void dispose() {
-    _cameraController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _toggleRecording() async {
-    try {
-      if (_isRecording) {
-        final file = await _cameraController.stopVideoRecording();
-        if (mounted) Navigator.pop(context, file.path);
-      } else {
-        await _cameraController.startVideoRecording();
-        setState(() => _isRecording = true);
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(S.recordVideoTitle)),
-      body: SafeArea(
-        child: FutureBuilder<void>(
-          future: _initFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            return Column(
-              children: [
-                Expanded(
-                  child: Center(child: CameraPreview(_cameraController)),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Wrap(
-                    alignment: WrapAlignment.spaceEvenly,
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: _toggleRecording,
-                        icon: Icon(_isRecording
-                            ? Icons.stop_circle
-                            : Icons.videocam),
-                        label: Text(_isRecording
-                            ? S.stopRecording
-                            : S.startRecording),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
-                        ),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close),
-                        label: Text(S.cancel),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
     );
   }
 }

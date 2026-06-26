@@ -108,6 +108,7 @@ class S {
   static String get recordVideoTitle => _ar ? 'تسجيل فيديو' : 'Record Video';
   static String get startRecording => _ar ? 'بدء التسجيل' : 'Start Recording';
   static String get stopRecording => _ar ? 'إيقاف التسجيل' : 'Stop Recording';
+  static String get switchCamera => _ar ? 'تبديل الكاميرا' : 'Switch Camera';
   static String get cancel => _ar ? 'إلغاء' : 'Cancel';
 
   // ── About & Help ──────────────────────────────────────────────────────────
