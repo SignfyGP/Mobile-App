@@ -61,25 +61,28 @@ class _SplashScreenState extends State<SplashScreen>
           opacity: _fadeAnimation,
           child: ScaleTransition(
             scale: _scaleAnimation,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.asset(
-                  'assets/images/logo.png',
-                  width: 200,
-                  height: 200,
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  AppConfig.appName,
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.cyan,
-                    letterSpacing: 1.5,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/images/logo.png',
+                    width: 200,
+                    height: 200,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 24),
+                  const Text(
+                    AppConfig.appName,
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.cyan,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

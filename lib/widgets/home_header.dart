@@ -34,32 +34,38 @@ class HomeHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 16),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ShaderMask(
-              shaderCallback: (bounds) => const LinearGradient(
-                colors: [AppColors.cyan, Color(0xFF80E8FF)],
-              ).createShader(bounds),
-              child: const Text(
-                AppConfig.appName,
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [AppColors.cyan, Color(0xFF80E8FF)],
+                ).createShader(bounds),
+                child: const Text(
+                  AppConfig.appName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
-            ),
-            const Text(
-              AppConfig.description,
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.secondaryText,
-                letterSpacing: 0.3,
+              const Text(
+                AppConfig.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.secondaryText,
+                  letterSpacing: 0.3,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );

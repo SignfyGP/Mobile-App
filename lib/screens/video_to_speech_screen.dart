@@ -193,8 +193,7 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
           ));
 
     final response = await http.Response.fromStream(await request.send());
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      print(response.body);
+    if (response.statusCode != 200) {
       throw Exception('Sign-to-text server returned ${response.statusCode}');
     }
 
@@ -254,121 +253,165 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
     setState(() => _isPlayingSpeech = true);
   }
 
+  bool get _hasVideo =>
+      _videoController != null && _videoController!.value.isInitialized;
+
   @override
   Widget build(BuildContext context) {
-    final videoController = _videoController;
-    final hasVideo =
-        videoController != null && videoController.value.isInitialized;
     final isArabic = SettingsService.instance.appLanguage == 'ar';
+    final previewHeight =
+        (MediaQuery.of(context).size.height * 0.4).clamp(180.0, 360.0);
 
     return Scaffold(
       appBar: AppBar(title: Text(S.signToSpeechTitle)),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                S.inputVideo,
-                style: const TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-              if (hasVideo)
-                AspectRatio(
-                  aspectRatio: videoController.value.aspectRatio,
-                  child: VideoPlayer(videoController),
-                )
-              else
-                Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF162235),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      S.noVideoSelected,
-                      style: const TextStyle(
-                          fontSize: 16, color: Colors.white54),
-                    ),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final stackSourceButtons = constraints.maxWidth < 480;
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        S.inputVideo,
+                        style: const TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildVideoPreview(previewHeight),
+                      const SizedBox(height: 12),
+                      _buildSourceButtons(stackSourceButtons),
+                      const SizedBox(height: 8),
+                      ElevatedButton.icon(
+                        onPressed: _hasVideo ? _toggleVideoPlayback : null,
+                        icon: Icon(_hasVideo && _isPlayingVideo
+                            ? Icons.pause
+                            : Icons.play_arrow),
+                        label: Text(
+                          _hasVideo && _isPlayingVideo
+                              ? S.pauseVideo
+                              : S.playVideo,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        onPressed: _isTranslating || !_hasVideo
+                            ? null
+                            : _translateToSpeech,
+                        icon: _isTranslating
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.language),
+                        label: Text(
+                          _isTranslating ? S.translating : S.translateToSpeech,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        S.generatedSpeech,
+                        style: const TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.w600),
+                      ),
+                      if (_translatedText != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          S.translatedLabel(_translatedText!),
+                          textDirection: isArabic
+                              ? TextDirection.rtl
+                              : TextDirection.ltr,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: _generatedSpeechPath == null
+                            ? null
+                            : _toggleSpeechPlayback,
+                        icon: Icon(_isPlayingSpeech
+                            ? Icons.stop_circle
+                            : Icons.play_arrow),
+                        label: Text(
+                          _isPlayingSpeech
+                              ? S.stopSpeech
+                              : S.playGeneratedSpeech,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _recordNewVideo,
-                      icon: const Icon(Icons.videocam),
-                      label: Text(S.recordVideo),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _selectVideoFromGallery,
-                      icon: const Icon(Icons.folder_open),
-                      label: Text(S.selectVideo),
-                    ),
-                  ),
-                ],
               ),
-              const SizedBox(height: 8),
-              ElevatedButton.icon(
-                onPressed: hasVideo ? _toggleVideoPlayback : null,
-                icon: Icon(hasVideo && _isPlayingVideo
-                    ? Icons.pause
-                    : Icons.play_arrow),
-                label: Text(hasVideo && _isPlayingVideo
-                    ? S.pauseVideo
-                    : S.playVideo),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed:
-                    _isTranslating || !hasVideo ? null : _translateToSpeech,
-                icon: _isTranslating
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.language),
-                label: Text(
-                    _isTranslating ? S.translating : S.translateToSpeech),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                S.generatedSpeech,
-                style: const TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.w600),
-              ),
-              if (_translatedText != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  S.translatedLabel(_translatedText!),
-                  textDirection:
-                      isArabic ? TextDirection.rtl : TextDirection.ltr,
-                  style: const TextStyle(fontSize: 14),
-                ),
-              ],
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                onPressed: _generatedSpeechPath == null
-                    ? null
-                    : _toggleSpeechPlayback,
-                icon: Icon(_isPlayingSpeech
-                    ? Icons.stop_circle
-                    : Icons.play_arrow),
-                label: Text(
-                    _isPlayingSpeech ? S.stopSpeech : S.playGeneratedSpeech),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
+    );
+  }
+
+  Widget _buildVideoPreview(double height) {
+    final controller = _videoController;
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: ColoredBox(
+          color: const Color(0xFF162235),
+          // FittedBox-style centering keeps any aspect ratio inside the box
+          // without overflowing, regardless of portrait/landscape source.
+          child: _hasVideo && controller != null
+              ? Center(
+                  child: AspectRatio(
+                    aspectRatio: controller.value.aspectRatio,
+                    child: VideoPlayer(controller),
+                  ),
+                )
+              : Center(
+                  child: Text(
+                    S.noVideoSelected,
+                    style:
+                        const TextStyle(fontSize: 16, color: Colors.white54),
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSourceButtons(bool stack) {
+    final record = ElevatedButton.icon(
+      onPressed: _recordNewVideo,
+      icon: const Icon(Icons.videocam),
+      label: Text(S.recordVideo, overflow: TextOverflow.ellipsis),
+    );
+    final select = ElevatedButton.icon(
+      onPressed: _selectVideoFromGallery,
+      icon: const Icon(Icons.folder_open),
+      label: Text(S.selectVideo, overflow: TextOverflow.ellipsis),
+    );
+
+    if (stack) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [record, const SizedBox(height: 8), select],
+      );
+    }
+    return Row(
+      children: [
+        Expanded(child: record),
+        const SizedBox(width: 8),
+        Expanded(child: select),
+      ],
     );
   }
 }
@@ -421,48 +464,54 @@ class _CameraRecorderPageState extends State<CameraRecorderPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(S.recordVideoTitle)),
-      body: FutureBuilder<void>(
-        future: _initFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          return Column(
-            children: [
-              Expanded(child: CameraPreview(_cameraController)),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: _toggleRecording,
-                      icon: Icon(_isRecording
-                          ? Icons.stop_circle
-                          : Icons.videocam),
-                      label: Text(_isRecording
-                          ? S.stopRecording
-                          : S.startRecording),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 24, vertical: 12),
-                      ),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
-                      label: Text(S.cancel),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 24, vertical: 12),
-                      ),
-                    ),
-                  ],
+      body: SafeArea(
+        child: FutureBuilder<void>(
+          future: _initFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            return Column(
+              children: [
+                Expanded(
+                  child: Center(child: CameraPreview(_cameraController)),
                 ),
-              ),
-            ],
-          );
-        },
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceEvenly,
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: _toggleRecording,
+                        icon: Icon(_isRecording
+                            ? Icons.stop_circle
+                            : Icons.videocam),
+                        label: Text(_isRecording
+                            ? S.stopRecording
+                            : S.startRecording),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                        label: Text(S.cancel),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
