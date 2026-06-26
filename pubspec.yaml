@@ -37,6 +37,7 @@ dependencies:
   o3d: ^3.1.0
   record: ^6.1.2
   flutter_3d_controller: ^2.3.0
+  flutter_inappwebview: ^6.0.0
   path_provider: ^2.1.5
   audioplayers: ^6.5.0
   video_player: ^2.10.0
@@ -72,14 +73,17 @@ flutter:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
   assets:
+    - assets/sign_player.html
     - assets/images/logo.png
-    - assets/models/avatar.glb
-    - assets/models/bowing.glb
-    - assets/models/hero.glb
-    - assets/models/model.glb
+    # - assets/models/avatar.glb
+    # - assets/models/bowing.glb
+    # - assets/models/hero.glb
+    # - assets/models/model.glb
     - assets/models/sign_avatar.glb
-    - assets/models/ramy_signs.glb
+    # - assets/models/ramy_signs.glb
     - assets/models/kate_signs.glb
+    # - assets/models/normalized.glb
+    - assets/models/all_signs_reset.glb
 
 flutter_launcher_icons:
   android: true

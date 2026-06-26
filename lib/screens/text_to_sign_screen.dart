@@ -2,12 +2,12 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_3d_controller/flutter_3d_controller.dart';
 import 'package:http/http.dart' as http;
 import 'package:signfy/core/constants/app_config.dart';
 import 'package:signfy/core/constants/colors.dart';
 import 'package:signfy/core/constants/strings.dart';
 import 'package:signfy/core/services/settings_service.dart';
+import 'package:signfy/widgets/sign_avatar_player.dart';
 
 const _cyan = AppColors.cyan;
 
@@ -21,29 +21,52 @@ class TextToSignPage extends StatefulWidget {
 }
 
 class _TextToSignPageState extends State<TextToSignPage> {
-  final Flutter3DController _avatarController = Flutter3DController();
   final TextEditingController _textController = TextEditingController();
+  final SignAvatarPlayerController _avatarController =
+      SignAvatarPlayerController();
 
   String get _endpoint => '${AppConfig.backendBaseUrl}/text-to-sign';
 
   List<String> _signIds = [];
+  String? _transcribedText;
   bool _isTranslating = false;
-  bool _isPlaying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _avatarController.addListener(_handleAvatarUpdate);
+    _avatarController.initialize();
+  }
+
+  void _handleAvatarUpdate() {
+    if (!mounted) return;
+
+    final error = _avatarController.consumeError();
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(S.translationFailed(error))),
+      );
+    }
+    setState(() {});
+  }
 
   @override
   void dispose() {
+    _avatarController.removeListener(_handleAvatarUpdate);
+    _avatarController.dispose();
     _textController.dispose();
     super.dispose();
   }
 
   Future<void> _translate() async {
     final text = _textController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || !_avatarController.modelReady) return;
 
     FocusScope.of(context).unfocus();
     setState(() {
       _isTranslating = true;
       _signIds = [];
+      _transcribedText = null;
     });
 
     try {
@@ -68,13 +91,15 @@ class _TextToSignPageState extends State<TextToSignPage> {
       }
 
       final raw = decoded['sign_ids'];
-      final ids =
-          raw is List ? raw.map((e) => e.toString()).toList() : <String>[];
+      final ids = raw is List ? raw.map((e) => e.toString()).toList() : <String>[];
 
       if (!mounted) return;
-      setState(() => _signIds = ids);
+      setState(() {
+        _signIds = ids;
+        _transcribedText = text;
+      });
 
-      await _playAnimations(ids);
+      await _avatarController.playSequence(ids);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -85,38 +110,22 @@ class _TextToSignPageState extends State<TextToSignPage> {
     }
   }
 
-  Future<void> _playAnimations(List<String> ids) async {
-    if (ids.isEmpty) return;
+  Future<void> _togglePause() async {
+    await _avatarController.togglePause();
+  }
 
-    final available = (await _avatarController.getAvailableAnimations())
-        .map((e) => e.toString())
-        .toSet();
-
-    if (available.isEmpty) return;
-
-    setState(() => _isPlaying = true);
-
-    for (final id in ids) {
-      if (!mounted) break;
-      if (!available.contains(id)) continue;
-      _avatarController.playAnimation(animationName: id);
-      await Future.delayed(const Duration(milliseconds: 1200));
-    }
-
-    await Future.delayed(const Duration(milliseconds: 300));
-    _avatarController.stopAnimation();
-
-    if (mounted) setState(() => _isPlaying = false);
+  Future<void> _setSpeed(double speed) async {
+    await _avatarController.setSpeed(speed);
   }
 
   Future<void> _replay() async {
-    if (_signIds.isEmpty || _isPlaying || _isTranslating) return;
-    await _playAnimations(_signIds);
+    if (_signIds.isEmpty || _isTranslating) return;
+    await _avatarController.replay();
   }
 
   @override
   Widget build(BuildContext context) {
-    final busy = _isTranslating || _isPlaying;
+    final busy = _isTranslating;
     final isArabic = SettingsService.instance.appLanguage == 'ar';
 
     return Scaffold(
@@ -128,43 +137,76 @@ class _TextToSignPageState extends State<TextToSignPage> {
           children: [
             const SizedBox(height: 15),
 
-            if (_signIds.isEmpty && !_isTranslating)
-              const Center(child: _IdleHint()),
-
-            if (_isPlaying)
-              const Positioned(top: 12, right: 12, child: _SigningBadge()),
-
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: Stack(
                   children: [
-                    Flutter3DViewer(
-                      activeGestureInterceptor: true,
-                      progressBarColor: _cyan,
-                      enableTouch: true,
-                      controller: _avatarController,
-                      src: 'assets/models/kate_signs.glb',
+                    Positioned.fill(
+                      child: SignAvatarPlayerView(controller: _avatarController),
+                    ),
+                    if (_signIds.isEmpty && !_isTranslating && _avatarController.modelReady)
+                      Center(
+                        child: SignAvatarHint(
+                          icon: Icons.sign_language_rounded,
+                          message: S.textIdleHint,
+                          iconColor: Color(0x4DFFFFFF),
+                          textColor: Color(0x80FFFFFF),
+                        ),
+                      ),
+                    if (_avatarController.isPlaying)
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: SignAvatarSigningBadge(
+                          label: _avatarController.currentSign,
+                        ),
+                      ),
+                    if (!_avatarController.modelReady)
+                      Positioned.fill(
+                        child: SignAvatarLoadingOverlay(
+                          progress: _avatarController.loadProgress,
+                        ),
                       ),
                   ],
                 ),
               ),
             ),
 
+            const SizedBox(height: 10),
+            SignAvatarSpeedSelector(
+              speed: _avatarController.speed,
+              enabled: _avatarController.modelReady,
+              onChanged: _setSpeed,
+            ),
+
             if (_signIds.isNotEmpty) ...[
               const SizedBox(height: 10),
-              _ChipRow(ids: _signIds, onReplay: busy ? null : _replay),
+              SignAvatarChipRow(
+                ids: _signIds,
+                onReplay: (_avatarController.isPlaying || busy) ? null : _replay,
+                onPauseToggle:
+                    _avatarController.isPlaying ? _togglePause : null,
+                isPaused: _avatarController.isPaused,
+              ),
             ],
 
             const SizedBox(height: 12),
+
+            if (_transcribedText != null) ...[
+              const SizedBox(height: 2),
+              SignAvatarTranscriptionCard(
+                text: _transcribedText!,
+                isArabic: isArabic,
+              ),
+            ],
 
             TextField(
               controller: _textController,
               inputFormatters: isArabic
                   ? [FilteringTextInputFormatter.allow(_arabicRegex)]
                   : null,
-              textDirection:
-                  isArabic ? TextDirection.rtl : TextDirection.ltr,
+              textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
               textAlign: isArabic ? TextAlign.right : TextAlign.left,
               keyboardType: TextInputType.text,
               minLines: 2,
@@ -213,9 +255,8 @@ class _TextToSignPageState extends State<TextToSignPage> {
 
             const SizedBox(height: 10),
 
-            // ── Translate button ───────────────────────────────────────────
             ElevatedButton.icon(
-              onPressed: busy ? null : _translate,
+              onPressed: (busy || !_avatarController.modelReady) ? null : _translate,
               icon: _isTranslating
                   ? const SizedBox(
                       width: 18,
@@ -225,13 +266,13 @@ class _TextToSignPageState extends State<TextToSignPage> {
                         color: Colors.black,
                       ),
                     )
-                  : _isPlaying
+                  : _avatarController.isPlaying
                       ? const Icon(Icons.sign_language_rounded)
                       : const Icon(Icons.translate_rounded),
               label: Text(
                 _isTranslating
                     ? S.translating
-                    : _isPlaying
+                    : _avatarController.isPlaying
                         ? S.signingEllipsis
                         : S.translateToSign,
                 style: const TextStyle(fontWeight: FontWeight.w600),
@@ -244,140 +285,6 @@ class _TextToSignPageState extends State<TextToSignPage> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _IdleHint extends StatelessWidget {
-  const _IdleHint();
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.sign_language_rounded,
-            size: 52,
-            color: AppColors.secondaryText.withValues(alpha: 0.3),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            S.textIdleHint,
-            style: TextStyle(
-              fontSize: 13,
-              color: AppColors.secondaryText.withValues(alpha: 0.5),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SigningBadge extends StatelessWidget {
-  const _SigningBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: _cyan.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _cyan.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(
-            width: 8,
-            height: 8,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-              color: _cyan,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            S.signing,
-            style: const TextStyle(
-              fontSize: 12,
-              color: _cyan,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ChipRow extends StatelessWidget {
-  const _ChipRow({required this.ids, required this.onReplay});
-  final List<String> ids;
-  final VoidCallback? onReplay;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: ids.map((id) => _Chip(id)).toList(),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Tooltip(
-          message: 'Replay',
-          child: GestureDetector(
-            onTap: onReplay,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: _cyan.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _cyan.withValues(alpha: 0.3)),
-              ),
-              child: Icon(
-                Icons.replay_rounded,
-                size: 18,
-                color: onReplay != null ? _cyan : AppColors.secondaryText,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _Chip extends StatelessWidget {
-  const _Chip(this.id);
-  final String id;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppColors.cardDark,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      child: Text(
-        id,
-        style: const TextStyle(
-          fontSize: 11,
-          color: AppColors.secondaryText,
-          fontWeight: FontWeight.w500,
         ),
       ),
     );

@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_3d_controller/flutter_3d_controller.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
@@ -10,6 +9,7 @@ import 'package:signfy/core/constants/app_config.dart';
 import 'package:signfy/core/constants/colors.dart';
 import 'package:signfy/core/constants/strings.dart';
 import 'package:signfy/core/services/settings_service.dart';
+import 'package:signfy/widgets/sign_avatar_player.dart';
 
 const _cyan = AppColors.cyan;
 
@@ -23,8 +23,11 @@ class SpeechToVideoPage extends StatefulWidget {
 class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
   final AudioRecorder _audioRecorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
-  final Flutter3DController _avatarController = Flutter3DController();
+  final SignAvatarPlayerController _avatarController =
+      SignAvatarPlayerController();
 
+  String get _backendEndpoint =>
+      '${AppConfig.backendBaseUrl}/speech-to-skeleton-video';
   String get _backendEndpoint =>
       '${AppConfig.backendBaseUrl}/speech-to-skeleton-video';
 
@@ -34,19 +37,34 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
   bool _isRecording = false;
   bool _isPlayingAudio = false;
   bool _isTranslating = false;
-  bool _isPlaying = false;
 
   @override
   void initState() {
     super.initState();
+    _avatarController.addListener(_handleAvatarUpdate);
     _audioPlayer.onPlayerComplete.listen((_) {
       if (!mounted) return;
       setState(() => _isPlayingAudio = false);
     });
+    _avatarController.initialize();
+  }
+
+  void _handleAvatarUpdate() {
+    if (!mounted) return;
+
+    final error = _avatarController.consumeError();
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(S.translationFailed(error))),
+      );
+    }
+    setState(() {});
   }
 
   @override
   void dispose() {
+    _avatarController.removeListener(_handleAvatarUpdate);
+    _avatarController.dispose();
     _audioRecorder.dispose();
     _audioPlayer.dispose();
     super.dispose();
@@ -102,8 +120,10 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
   }
 
   Future<void> _translateToSign() async {
+    // print("TRanslate");
+    // return;
     final recordedFilePath = _recordedFilePath;
-    if (recordedFilePath == null) return;
+    if (recordedFilePath == null || !_avatarController.modelReady) return;
 
     setState(() {
       _isTranslating = true;
@@ -147,7 +167,7 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
         _signIds = ids;
       });
 
-      await _playAvatarAnimations(ids);
+      await _avatarController.playSequence(ids);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -158,36 +178,22 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
     }
   }
 
-  Future<void> _playAvatarAnimations(List<String> animations) async {
-    final available = (await _avatarController.getAvailableAnimations())
-        .map((e) => e.toString())
-        .toSet();
-
-    if (available.isEmpty || animations.isEmpty) return;
-
-    setState(() => _isPlaying = true);
-
-    for (final name in animations) {
-      if (!mounted) break;
-      if (!available.contains(name)) continue;
-      _avatarController.playAnimation(animationName: name);
-      await Future.delayed(const Duration(milliseconds: 1200));
-    }
-
-    await Future.delayed(const Duration(milliseconds: 300));
-    _avatarController.stopAnimation();
-
-    if (mounted) setState(() => _isPlaying = false);
+  Future<void> _replay() async {
+    if (_signIds.isEmpty || _isTranslating) return;
+    await _avatarController.replay();
   }
 
-  Future<void> _replay() async {
-    if (_signIds.isEmpty || _isPlaying || _isTranslating) return;
-    await _playAvatarAnimations(_signIds);
+  Future<void> _togglePause() async {
+    await _avatarController.togglePause();
+  }
+
+  Future<void> _setSpeed(double speed) async {
+    await _avatarController.setSpeed(speed);
   }
 
   @override
   Widget build(BuildContext context) {
-    final busy = _isTranslating || _isPlaying;
+    final busy = _isTranslating || _avatarController.isPlaying;
     final hasRecording = _recordedFilePath != null;
     final isArabic = SettingsService.instance.appLanguage == 'ar';
 
@@ -198,42 +204,83 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_signIds.isEmpty && !_isTranslating && !_isRecording)
-              const Center(child: _IdleHint()),
-            if (_isRecording) const Center(child: _RecordingHint()),
-            if (_isPlaying)
-              const Positioned(top: 12, right: 12, child: _SigningBadge()),
+            const SizedBox(height: 8),
+
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: Stack(
                   children: [
-                    Flutter3DViewer(
-                      activeGestureInterceptor: true,
-                      progressBarColor: _cyan,
-                      enableTouch: true,
-                      controller: _avatarController,
-                      src: 'assets/models/kate_signs.glb',
+                    Positioned.fill(
+                      child: SignAvatarPlayerView(controller: _avatarController),
+                    ),
+                    if (_isRecording)
+                      Center(
+                        child: SignAvatarHint(
+                          icon: Icons.graphic_eq_rounded,
+                          message: S.listening,
+                          iconColor: Colors.redAccent.withValues(alpha: 0.6),
+                          textColor: Colors.redAccent.withValues(alpha: 0.7),
+                        ),
+                      )
+                    else if (_signIds.isEmpty && !_isTranslating && _avatarController.modelReady)
+                      Center(
+                        child: SignAvatarHint(
+                          icon: Icons.mic_rounded,
+                          message: S.recordHint,
+                          iconColor: AppColors.secondaryText.withValues(alpha: 0.3),
+                          textColor: AppColors.secondaryText.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    if (_avatarController.isPlaying)
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: SignAvatarSigningBadge(
+                          label: _avatarController.currentSign,
+                        ),
+                      ),
+                    if (!_avatarController.modelReady)
+                      Positioned.fill(
+                        child: SignAvatarLoadingOverlay(
+                          progress: _avatarController.loadProgress,
+                        ),
                       ),
                   ],
                 ),
               ),
             ),
 
+            const SizedBox(height: 10),
+            SignAvatarSpeedSelector(
+              speed: _avatarController.speed,
+              enabled: _avatarController.modelReady,
+              onChanged: _setSpeed,
+            ),
+
             if (_transcribedText != null) ...[
               const SizedBox(height: 10),
-              _TranscriptionCard(text: _transcribedText!, isArabic: isArabic),
+              SignAvatarTranscriptionCard(
+                text: _transcribedText!,
+                isArabic: isArabic,
+              ),
             ],
 
             if (_signIds.isNotEmpty) ...[
               const SizedBox(height: 8),
-              _ChipRow(ids: _signIds, onReplay: busy ? null : _replay),
+              SignAvatarChipRow(
+                ids: _signIds,
+                onReplay: (_avatarController.isPlaying || busy) ? null : _replay,
+                onPauseToggle:
+                    _avatarController.isPlaying ? _togglePause : null,
+                isPaused: _avatarController.isPaused,
+              ),
             ],
 
             const SizedBox(height: 12),
 
             if (hasRecording) ...[
-              _AudioPlaybackRow(
+              SignAvatarAudioRow(
                 isPlaying: _isPlayingAudio,
                 onToggle: _toggleAudioPlayback,
               ),
@@ -248,7 +295,10 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
             const SizedBox(height: 10),
 
             ElevatedButton.icon(
-              onPressed: !hasRecording || busy ? null : _translateToSign,
+              onPressed:
+                  !hasRecording || busy || !_avatarController.modelReady
+                      ? null
+                      : _translateToSign,
               icon: _isTranslating
                   ? const SizedBox(
                       width: 18,
@@ -258,13 +308,13 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
                         color: Colors.black,
                       ),
                     )
-                  : _isPlaying
+                  : _avatarController.isPlaying
                       ? const Icon(Icons.sign_language_rounded)
                       : const Icon(Icons.translate_rounded),
               label: Text(
                 _isTranslating
                     ? S.translating
-                    : _isPlaying
+                    : _avatarController.isPlaying
                         ? S.signingEllipsis
                         : S.translateToSign,
                 style: const TextStyle(fontWeight: FontWeight.w600),
@@ -283,184 +333,9 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
   }
 }
 
-class _IdleHint extends StatelessWidget {
-  const _IdleHint();
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.mic_rounded,
-            size: 52,
-            color: AppColors.secondaryText.withValues(alpha: 0.3),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            S.recordHint,
-            style: TextStyle(
-              fontSize: 13,
-              color: AppColors.secondaryText.withValues(alpha: 0.5),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RecordingHint extends StatelessWidget {
-  const _RecordingHint();
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.graphic_eq_rounded,
-            size: 52,
-            color: Colors.redAccent.withValues(alpha: 0.6),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            S.listening,
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.redAccent.withValues(alpha: 0.7),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SigningBadge extends StatelessWidget {
-  const _SigningBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: _cyan.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _cyan.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(
-            width: 8,
-            height: 8,
-            child: CircularProgressIndicator(strokeWidth: 1.5, color: _cyan),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            S.signing,
-            style: const TextStyle(
-              fontSize: 12,
-              color: _cyan,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TranscriptionCard extends StatelessWidget {
-  const _TranscriptionCard({required this.text, required this.isArabic});
-  final String text;
-  final bool isArabic;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.cardDark,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.record_voice_over_rounded, size: 16, color: _cyan),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              textDirection:
-                  isArabic ? TextDirection.rtl : TextDirection.ltr,
-              textAlign: isArabic ? TextAlign.right : TextAlign.left,
-              style: const TextStyle(fontSize: 14, color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AudioPlaybackRow extends StatelessWidget {
-  const _AudioPlaybackRow({required this.isPlaying, required this.onToggle});
-  final bool isPlaying;
-  final VoidCallback onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onToggle,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.cardDark,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isPlaying
-                ? _cyan.withValues(alpha: 0.5)
-                : AppColors.cardBorder,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isPlaying
-                  ? Icons.stop_circle_outlined
-                  : Icons.play_circle_outline_rounded,
-              color: _cyan,
-              size: 22,
-            ),
-            const SizedBox(width: 10),
-            Text(
-              isPlaying ? S.stopPlayback : S.playRecordedAudio,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const Spacer(),
-            Icon(
-              Icons.audiotrack_rounded,
-              size: 14,
-              color: AppColors.secondaryText.withValues(alpha: 0.5),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _RecordButton extends StatelessWidget {
   const _RecordButton({required this.isRecording, required this.onTap});
+
   final bool isRecording;
   final VoidCallback? onTap;
 
@@ -488,74 +363,6 @@ class _RecordButton extends StatelessWidget {
             size: 32,
             color: isRecording ? Colors.redAccent : _cyan,
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ChipRow extends StatelessWidget {
-  const _ChipRow({required this.ids, required this.onReplay});
-  final List<String> ids;
-  final VoidCallback? onReplay;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: ids.map((id) => _Chip(id)).toList(),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Tooltip(
-          message: 'Replay',
-          child: GestureDetector(
-            onTap: onReplay,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: _cyan.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _cyan.withValues(alpha: 0.3)),
-              ),
-              child: Icon(
-                Icons.replay_rounded,
-                size: 18,
-                color: onReplay != null ? _cyan : AppColors.secondaryText,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _Chip extends StatelessWidget {
-  const _Chip(this.id);
-  final String id;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppColors.cardDark,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      child: Text(
-        id,
-        style: const TextStyle(
-          fontSize: 11,
-          color: AppColors.secondaryText,
-          fontWeight: FontWeight.w500,
         ),
       ),
     );
