@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsService {
   static const _keyLanguage = 'app_language';
+  static const _keyOnboardingDone = 'onboarding_done';
 
   static SettingsService? _instance;
   static SettingsService get instance => _instance!;
@@ -20,6 +21,11 @@ class SettingsService {
 
   Future<void> setAppLanguage(String lang) =>
       _prefs.setString(_keyLanguage, lang);
+
+  bool get onboardingDone => _prefs.getBool(_keyOnboardingDone) ?? false;
+
+  Future<void> setOnboardingDone() =>
+      _prefs.setBool(_keyOnboardingDone, true);
 
   Future<void> resetToDefaults() => _prefs.remove(_keyLanguage);
 }

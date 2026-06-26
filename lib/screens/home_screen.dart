@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:signfy/core/constants/colors.dart';
 import 'package:signfy/core/constants/strings.dart';
-import 'package:signfy/screens/avatar_screen.dart';
+import 'package:signfy/screens/about_help_screen.dart';
 import 'package:signfy/screens/settings_screen.dart';
 import 'package:signfy/screens/speech_to_video_screen.dart';
-import 'package:signfy/screens/text_to_sign_screen.dart';
 import 'package:signfy/screens/video_to_speech_screen.dart';
-import 'package:signfy/widgets/explore_card.dart';
 import 'package:signfy/widgets/home_header.dart';
 import 'package:signfy/widgets/section_label.dart';
 import 'package:signfy/widgets/translation_card.dart';
@@ -46,6 +44,13 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   const Expanded(child: HomeHeader()),
                   IconButton(
+                    onPressed: () =>
+                        _go(context, const AboutHelpScreen()),
+                    icon: const Icon(Icons.help_outline_rounded),
+                    color: AppColors.secondaryText,
+                    tooltip: S.aboutHelpTooltip,
+                  ),
+                  IconButton(
                     onPressed: _goSettings,
                     icon: const Icon(Icons.settings_outlined),
                     color: AppColors.secondaryText,
@@ -67,16 +72,6 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 16),
               TranslationCard(
-                title: S.textToSign,
-                subtitle: S.textToSignSub,
-                iconTop: Icons.keyboard_rounded,
-                iconBottom: Icons.sign_language_rounded,
-                gradientColors: const [Color(0xFF065F46), Color(0xFF047857)],
-                accentColor: const Color(0xFF10B981),
-                onTap: () => _go(context, const TextToSignPage()),
-              ),
-              const SizedBox(height: 16),
-              TranslationCard(
                 title: S.signToSpeech,
                 subtitle: S.signToSpeechSub,
                 iconTop: Icons.sign_language_rounded,
@@ -84,12 +79,6 @@ class _HomePageState extends State<HomePage> {
                 gradientColors: const [Color(0xFF5B21B6), Color(0xFF3B0764)],
                 accentColor: AppColors.purple,
                 onTap: () => _go(context, const VideoToSpeechPage()),
-              ),
-              const SizedBox(height: 32),
-              SectionLabel(S.explore),
-              const SizedBox(height: 16),
-              ExploreCard(
-                onTap: () => _go(context, const ViewerPage()),
               ),
               const SizedBox(height: 32),
             ],
