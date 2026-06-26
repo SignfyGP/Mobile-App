@@ -28,8 +28,6 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
 
   String get _backendEndpoint =>
       '${AppConfig.backendBaseUrl}/speech-to-skeleton-video';
-  String get _backendEndpoint =>
-      '${AppConfig.backendBaseUrl}/speech-to-skeleton-video';
 
   String? _recordedFilePath;
   String? _transcribedText;
