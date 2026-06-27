@@ -86,6 +86,7 @@ class S {
   static String get stopSpeech => _ar ? 'إيقاف الكلام' : 'Stop Speech';
   static String get playGeneratedSpeech =>
       _ar ? 'تشغيل الكلام' : 'Play Generated Speech';
+  static String get reReadSpeech => _ar ? 'إعادة القراءة' : 'Re-read';
   static String get videoRecordedOk =>
       _ar ? 'تم تسجيل الفيديو بنجاح!' : 'Video recorded successfully!';
   static String get videoLoadedOk =>

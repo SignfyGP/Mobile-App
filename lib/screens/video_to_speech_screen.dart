@@ -173,6 +173,12 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(S.videoTranslatedOk)));
+
+      // Speak the recognized text aloud automatically; the last button then
+      // only re-reads it on demand instead of being the first play.
+      await _audioPlayer.play(DeviceFileSource(speechPath));
+      if (!mounted) return;
+      setState(() => _isPlayingSpeech = true);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -351,12 +357,12 @@ class _VideoToSpeechPageState extends State<VideoToSpeechPage> {
                         icon: Icon(
                           _isPlayingSpeech
                               ? Icons.stop_circle
-                              : Icons.play_arrow,
+                              : Icons.replay,
                         ),
                         label: Text(
                           _isPlayingSpeech
                               ? S.stopSpeech
-                              : S.playGeneratedSpeech,
+                              : S.reReadSpeech,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
