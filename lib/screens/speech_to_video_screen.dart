@@ -180,7 +180,7 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
   }
 
   Future<void> _translateToSign() async {
-    // print("TRanslate");
+    print("TRanslate");
     // return;
     final recordedFilePath = _recordedFilePath;
     if (recordedFilePath == null || !_avatarController.modelReady) return;
@@ -196,12 +196,17 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
       if (transcript == null || transcript.isEmpty) {
         throw Exception('No transcript received');
       }
-
+      print("Trans:");
+      print(transcript);
       if (!mounted) return;
       setState(() => _transcribedText = transcript);
       final signIds = await _textToGlosses(transcript);
 
-      await _avatarController.playSequence(signIds);
+      print("Sign Ids:");
+      print(signIds);
+      final signsPadded =paddSigns(signIds);
+      setState(() => _signIds = signsPadded);
+      await _avatarController.playSequence(signsPadded);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -210,6 +215,10 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
     } finally {
       if (mounted) setState(() => _isTranslating = false);
     }
+  }
+
+  List<String> paddSigns(List<String> signs){
+    return signs.map((sign) => sign.padLeft(4, '0')).toList();
   }
 
   Future<void> _replay() async {
