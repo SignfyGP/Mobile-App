@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -22,7 +21,6 @@ class SpeechToVideoPage extends StatefulWidget {
 
 class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
   final AudioRecorder _audioRecorder = AudioRecorder();
-  final AudioPlayer _audioPlayer = AudioPlayer();
   final SignAvatarPlayerController _avatarController =
       SignAvatarPlayerController();
 
@@ -33,17 +31,12 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
   String? _transcribedText;
   List<String> _signIds = [];
   bool _isRecording = false;
-  bool _isPlayingAudio = false;
   bool _isTranslating = false;
 
   @override
   void initState() {
     super.initState();
     _avatarController.addListener(_handleAvatarUpdate);
-    _audioPlayer.onPlayerComplete.listen((_) {
-      if (!mounted) return;
-      setState(() => _isPlayingAudio = false);
-    });
     _avatarController.initialize();
   }
 
@@ -64,7 +57,6 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
     _avatarController.removeListener(_handleAvatarUpdate);
     _avatarController.dispose();
     _audioRecorder.dispose();
-    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -75,6 +67,9 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
         _isRecording = false;
         if (path != null) _recordedFilePath = path;
       });
+      if (path != null && _avatarController.modelReady) {
+        await _translateToSign();
+      }
       return;
     }
 
@@ -102,19 +97,6 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
       _transcribedText = null;
       _signIds = [];
     });
-  }
-
-  Future<void> _toggleAudioPlayback() async {
-    if (_recordedFilePath == null) return;
-
-    if (_isPlayingAudio) {
-      await _audioPlayer.stop();
-      setState(() => _isPlayingAudio = false);
-      return;
-    }
-
-    await _audioPlayer.play(DeviceFileSource(_recordedFilePath!));
-    setState(() => _isPlayingAudio = true);
   }
 
   Future<String?> _transcribeAudio(String filePath) async {
@@ -196,14 +178,11 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
       if (transcript == null || transcript.isEmpty) {
         throw Exception('No transcript received');
       }
-      print("Trans:");
-      print(transcript);
+
       if (!mounted) return;
       setState(() => _transcribedText = transcript);
       final signIds = await _textToGlosses(transcript);
 
-      print("Sign Ids:");
-      print(signIds);
       final signsPadded =paddSigns(signIds);
       setState(() => _signIds = signsPadded);
       await _avatarController.playSequence(signsPadded);
@@ -219,15 +198,6 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
 
   List<String> paddSigns(List<String> signs){
     return signs.map((sign) => sign.padLeft(4, '0')).toList();
-  }
-
-  Future<void> _replay() async {
-    if (_signIds.isEmpty || _isTranslating) return;
-    await _avatarController.replay();
-  }
-
-  Future<void> _togglePause() async {
-    await _avatarController.togglePause();
   }
 
   Future<void> _setSpeed(double speed) async {
@@ -275,14 +245,6 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
                           textColor: AppColors.secondaryText.withValues(alpha: 0.5),
                         ),
                       ),
-                    if (_avatarController.isPlaying)
-                      Positioned(
-                        top: 12,
-                        right: 12,
-                        child: SignAvatarSigningBadge(
-                          label: _avatarController.currentSign,
-                        ),
-                      ),
                     if (!_avatarController.modelReady)
                       Positioned.fill(
                         child: SignAvatarLoadingOverlay(
@@ -301,74 +263,15 @@ class _SpeechToVideoPageState extends State<SpeechToVideoPage> {
               onChanged: _setSpeed,
             ),
 
-            if (_transcribedText != null) ...[
-              const SizedBox(height: 10),
-              SignAvatarTranscriptionCard(
-                text: _transcribedText!,
-                isArabic: isArabic,
-              ),
-            ],
 
-            if (_signIds.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              SignAvatarChipRow(
-                ids: _signIds,
-                onReplay: (_avatarController.isPlaying || busy) ? null : _replay,
-                onPauseToggle:
-                    _avatarController.isPlaying ? _togglePause : null,
-                isPaused: _avatarController.isPaused,
-              ),
-            ],
 
             const SizedBox(height: 12),
-
-            if (hasRecording) ...[
-              SignAvatarAudioRow(
-                isPlaying: _isPlayingAudio,
-                onToggle: _toggleAudioPlayback,
-              ),
-              const SizedBox(height: 12),
-            ],
 
             _RecordButton(
               isRecording: _isRecording,
               onTap: busy ? null : _toggleRecording,
             ),
 
-            const SizedBox(height: 10),
-
-            ElevatedButton.icon(
-              onPressed:
-                  !hasRecording || busy || !_avatarController.modelReady
-                      ? null
-                      : _translateToSign,
-              icon: _isTranslating
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.black,
-                      ),
-                    )
-                  : _avatarController.isPlaying
-                      ? const Icon(Icons.sign_language_rounded)
-                      : const Icon(Icons.translate_rounded),
-              label: Text(
-                _isTranslating
-                    ? S.translating
-                    : _avatarController.isPlaying
-                        ? S.signingEllipsis
-                        : S.translateToSign,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _cyan,
-                foregroundColor: Colors.black,
-                disabledBackgroundColor: AppColors.cardBorder,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
           ],
         ),
       ),
