@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: transparent; overflow: hidden; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+                 "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// ─── Scene Setup ────────────────────────────────────────────────────────────
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+
+// ─── FIXED CAMERA — never moves ─────────────────────────────────────────────
+// A longer lens (lower FOV) keeps hands/face from distorting near the edges.
+const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 1.4, 2.5);   // overwritten by frameUpperBody() once the model loads
+camera.lookAt(0, 1.0, 0);
+// DO NOT add OrbitControls — omitting it is the fix
+
+// Frames the avatar's upper body (waist → just above the head) from the model's
+// actual bounding box, so hands and face are always clearly visible regardless
+// of how the GLB is scaled or where its origin sits. Computed once = still fixed.
+let frameTarget = new THREE.Vector3(0, 1.0, 0);
+function frameUpperBody(model) {
+  const box = new THREE.Box3().setFromObject(model);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+
+  // ── Framing knobs ───────────────────────────────────────────────────────────
+  const UPPER = 0.4; // start of the frame as a fraction of height (~waist).
+                      // raise toward 0.6 to crop tighter to chest/face.
+  const FILL  = 1.25; // <1 zooms in (fills the screen more); >1 zooms out.
+
+  const height = size.y || 1;
+  const topY = box.max.y;                       // crown of the head
+  const bottomY = box.min.y + height * UPPER;   // ~waist
+  const targetY = (topY + bottomY) / 2;
+
+  // Frame on HEIGHT only so a narrow portrait viewport doesn't force the camera
+  // far back. The upper body fills the screen; arms hang within the width.
+  const frameH = (topY - bottomY);
+  const fovRad = camera.fov * Math.PI / 180;
+  const distance = ((frameH / 2) / Math.tan(fovRad / 2)) * FILL;
+
+  frameTarget.set(center.x, targetY, center.z);
+  camera.position.set(center.x, targetY, center.z + distance);
+  camera.lookAt(frameTarget);
+}
+
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+scene.add(ambientLight);
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+dirLight.position.set(2, 4, 3);
+scene.add(dirLight);
+
+// ─── State ───────────────────────────────────────────────────────────────────
+
+let mixer = null;
+let loadedModel = null;    // root of the loaded GLB scene
+let animations = {};       // { animationName: THREE.AnimationClip }
+let currentAction = null;  // The action currently playing
+let restClip = null;       // Cached rest/bind pose clip
+let isPlaying = false;
+let pendingSequence = [];
+let paused = false;
+let playbackSpeed = 1.0;
+
+// Canonical rest/default pose. Looked up by name, with the known list index as
+// a fallback in case the clip is ever renamed.
+const REST_CLIP_NAME = 'reset_pose';
+const REST_CLIP_INDEX = 502;
+
+// ─── Load GLB ────────────────────────────────────────────────────────────────
+
+const loader = new GLTFLoader();
+notify('load_start');
+loader.load('./models/all_signs_reset.glb', (gltf) => {
+  const model = gltf.scene;
+  scene.add(model);
+  loadedModel = model;
+  frameUpperBody(model);
+
+  mixer = new THREE.AnimationMixer(model);
+
+  // Index all animations by name for fast lookup
+  gltf.animations.forEach(clip => {
+    animations[clip.name] = clip;
+  });
+
+  // Default pose = the dedicated "reset_pose" clip (index 502 fallback), or a
+  // synthetic bind-pose clip only if neither is present.
+  restClip = animations[REST_CLIP_NAME]
+    || gltf.animations[REST_CLIP_INDEX]
+    || buildRestPoseClip(gltf.scene);
+
+  // Listen for when an action finishes naturally
+  mixer.addEventListener('finished', onActionFinished);
+
+  // Show the default pose immediately (no crossfade on first load).
+  applyRestPose(0);
+
+  notify('ready', { count: Object.keys(animations).length, animations: Object.keys(animations) });
+}, (xhr) => {
+  notify('load_progress', { loaded: xhr.loaded || 0, total: xhr.total || 0 });
+}, (err) => {
+  console.error('GLB load error:', err);
+  notify('error', { message: (err && err.message) ? err.message : String(err) });
+});
+
+// ─── Build Rest Pose Clip ─────────────────────────────────────────────────────
+
+function buildRestPoseClip(scene) {
+  // Captures current bind-pose transforms of every bone as a 1-frame clip
+  const tracks = [];
+  scene.traverse(obj => {
+    if (obj.isBone || obj.isSkinnedMesh) {
+      const name = obj.name;
+      tracks.push(new THREE.VectorKeyframeTrack(
+        `${name}.position`, [0], obj.position.toArray()
+      ));
+      tracks.push(new THREE.QuaternionKeyframeTrack(
+        `${name}.quaternion`, [0],
+        obj.quaternion.toArray()
+      ));
+    }
+  });
+  return new THREE.AnimationClip('__rest__', 0.001, tracks);
+}
+
+// ─── Core Playback Engine ─────────────────────────────────────────────────────
+
+/**
+ * Called from Flutter via JS injection.
+ * @param {Object} payload - { signs: string[], crossFadeDuration: number, playbackSpeed: number }
+ */
+window.playSignSequence = function(payload) {
+  if (isPlaying) stopCurrentPlayback();
+
+  paused = false;
+  pendingSequence = [...payload.signs];
+  const crossFade = payload.crossFadeDuration ?? 0.3;
+  playbackSpeed = payload.playbackSpeed ?? 1.0;
+
+  playNextInQueue(crossFade, playbackSpeed);
+};
+
+// Live playback controls (called from Flutter).
+window.setPlaybackSpeed = function(speed) {
+  playbackSpeed = (speed > 0) ? speed : 1.0;
+  if (currentAction) currentAction.timeScale = playbackSpeed;
+  notify('speed_changed', { speed: playbackSpeed });
+};
+window.pausePlayback = function() { paused = true; notify('paused'); };
+window.resumePlayback = function() { paused = false; notify('resumed'); };
+
+function playNextInQueue(crossFadeDuration, speed) {
+  if (pendingSequence.length === 0) {
+    // Sequence complete — return to rest pose
+    returnToRestPose(crossFadeDuration);
+    return;
+  }
+
+  const signName = pendingSequence.shift();
+  const clip = animations[signName];
+
+  if (!clip) {
+    console.warn(`Animation not found: ${signName}`);
+    playNextInQueue(crossFadeDuration, speed);
+    return;
+  }
+
+  const nextAction = mixer.clipAction(clip);
+  nextAction.setLoop(THREE.LoopOnce, 1);
+  nextAction.clampWhenFinished = true;   // Hold last frame until crossfade
+  nextAction.timeScale = speed;
+  nextAction.reset();
+
+  if (currentAction && currentAction !== nextAction) {
+    // Crossfade: fade out current, fade in next
+    crossFadeActions(currentAction, nextAction, crossFadeDuration);
+  } else {
+    nextAction.play();
+  }
+
+  currentAction = nextAction;
+  isPlaying = true;
+  notify('sign_start', { name: signName });
+
+  // Schedule next sign to start slightly before this one ends
+  // This overlaps playback intentionally for smoother transitions
+  const clipDuration = clip.duration / speed;
+  const overlapTime = Math.max(0, clipDuration - crossFadeDuration);
+
+  setTimeout(() => {
+    playNextInQueue(crossFadeDuration, speed);
+  }, overlapTime * 1000);
+}
+
+function crossFadeActions(fromAction, toAction, duration) {
+  // Sync the incoming action to the current mixer time
+  toAction.enabled = true;
+  toAction.setEffectiveTimeScale(1);
+  toAction.setEffectiveWeight(1);
+  toAction.reset();
+
+  fromAction.crossFadeTo(toAction, duration, true); // true = warp (handles speed differences)
+  toAction.play();
+}
+
+function onActionFinished(e) {
+  // This fires when a LoopOnce action reaches its end
+  // Used as a safety net if setTimeout drift occurs
+}
+
+function stopCurrentPlayback() {
+  pendingSequence = [];
+  isPlaying = false;
+  if (currentAction) {
+    currentAction.stop();
+  }
+}
+
+// ─── Objective 3: Reset to Rest Pose ─────────────────────────────────────────
+
+/**
+ * Smoothly returns the avatar to its bind/rest pose and clears all animation state.
+ * Called from Flutter via JS injection.
+ */
+window.resetToRestPose = function(duration = 0.4) {
+  returnToRestPose(duration);
+};
+
+// Drives the avatar to the reset_pose clip and holds its final frame. Pass
+// duration = 0 to snap instantly (used on first load).
+function applyRestPose(duration = 0.4) {
+  if (!mixer || !restClip) return;
+
+  const restAction = mixer.clipAction(restClip);
+  restAction.enabled = true;
+  restAction.setEffectiveWeight(1);
+  restAction.setEffectiveTimeScale(1);
+  restAction.setLoop(THREE.LoopOnce, 1);
+  restAction.clampWhenFinished = true; // hold the reset_pose, don't snap to bind pose
+  restAction.reset();
+
+  if (currentAction && currentAction !== restAction && duration > 0) {
+    currentAction.crossFadeTo(restAction, duration, false);
+  }
+  restAction.play();
+  currentAction = restAction;
+}
+
+function returnToRestPose(duration = 0.4) {
+  if (!mixer || !restClip) return;
+  pendingSequence = [];
+  applyRestPose(duration);
+  isPlaying = false;
+  notify('sequence_complete');
+}
+
+function restoreBindPose(scene) {
+  // Walk skeleton and reset every bone to its bind matrix inverse
+  scene.traverse(obj => {
+    if (obj.isSkinnedMesh) {
+      obj.skeleton.pose(); // THREE.js built-in: resets all bones to bind pose
+    }
+  });
+}
+
+// ─── Render Loop ──────────────────────────────────────────────────────────────
+
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+  if (mixer && !paused) mixer.update(delta);
+  renderer.render(scene, camera);
+}
+
+animate();
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
+function notify(event, data = {}) {
+  const payload = JSON.stringify({ event, ...data });
+  if (window.FlutterBridge) {
+    window.FlutterBridge.postMessage(payload);
+  }
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  if (loadedModel) frameUpperBody(loadedModel); // re-frame for the new aspect
+});
+</script>
+</body>
+</html>
